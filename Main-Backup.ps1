@@ -197,6 +197,7 @@ function Start-BackupProcess {
             BackupBookmarks   = $true
             BackupRegistry    = $true
             BackupCloudDrive  = $true
+            CloseBrowsers     = $true
         }
     }
     else {

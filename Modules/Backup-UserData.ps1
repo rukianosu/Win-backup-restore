@@ -394,6 +394,85 @@ function Backup-CloudDriveFolders {
 }
 
 #===============================================================================
+# 関数: Close-Browsers
+# 説明: Edge/Chromeを終了する
+#===============================================================================
+function Close-Browsers {
+    [CmdletBinding()]
+    param()
+
+    $closed = @{
+        Edge = $false
+        Chrome = $false
+    }
+
+    # Microsoft Edge を終了
+    $edgeProcesses = Get-Process -Name "msedge" -ErrorAction SilentlyContinue
+    if ($edgeProcesses) {
+        Write-BackupLog -Message "Microsoft Edge を終了中..." -Level 'INFO'
+        try {
+            $edgeProcesses | ForEach-Object { $_.CloseMainWindow() | Out-Null }
+            Start-Sleep -Seconds 2
+
+            # まだ残っていたら強制終了
+            $edgeProcesses = Get-Process -Name "msedge" -ErrorAction SilentlyContinue
+            if ($edgeProcesses) {
+                $edgeProcesses | Stop-Process -Force -ErrorAction SilentlyContinue
+                Start-Sleep -Seconds 1
+            }
+            Write-BackupLog -Message "Microsoft Edge を終了しました" -Level 'SUCCESS'
+            $closed.Edge = $true
+        }
+        catch {
+            Write-BackupLog -Message "Microsoft Edge の終了に失敗: $_" -Level 'WARNING'
+        }
+    }
+
+    # Google Chrome を終了
+    $chromeProcesses = Get-Process -Name "chrome" -ErrorAction SilentlyContinue
+    if ($chromeProcesses) {
+        Write-BackupLog -Message "Google Chrome を終了中..." -Level 'INFO'
+        try {
+            $chromeProcesses | ForEach-Object { $_.CloseMainWindow() | Out-Null }
+            Start-Sleep -Seconds 2
+
+            # まだ残っていたら強制終了
+            $chromeProcesses = Get-Process -Name "chrome" -ErrorAction SilentlyContinue
+            if ($chromeProcesses) {
+                $chromeProcesses | Stop-Process -Force -ErrorAction SilentlyContinue
+                Start-Sleep -Seconds 1
+            }
+            Write-BackupLog -Message "Google Chrome を終了しました" -Level 'SUCCESS'
+            $closed.Chrome = $true
+        }
+        catch {
+            Write-BackupLog -Message "Google Chrome の終了に失敗: $_" -Level 'WARNING'
+        }
+    }
+
+    return $closed
+}
+
+#===============================================================================
+# 関数: Test-BrowserRunning
+# 説明: ブラウザが起動中かチェック
+#===============================================================================
+function Test-BrowserRunning {
+    [CmdletBinding()]
+    param()
+
+    $running = @{
+        Edge = $false
+        Chrome = $false
+    }
+
+    $running.Edge = $null -ne (Get-Process -Name "msedge" -ErrorAction SilentlyContinue)
+    $running.Chrome = $null -ne (Get-Process -Name "chrome" -ErrorAction SilentlyContinue)
+
+    return $running
+}
+
+#===============================================================================
 # 関数: Backup-BrowserData
 # 説明: Edge/Chromeのブラウザデータをバックアップ
 #       （お気に入り、閲覧履歴、オートフィル、設定）
@@ -424,6 +503,27 @@ function Backup-BrowserData {
 
     Write-BackupLog -Message "=== ブラウザデータのバックアップ開始 ===" -Level 'INFO'
     Write-BackupLog -Message "（お気に入り、閲覧履歴、オートフィル、設定）" -Level 'INFO'
+
+    # ブラウザ自動終了オプションがONの場合
+    if ($Options.ContainsKey('CloseBrowsers') -and $Options['CloseBrowsers']) {
+        $browserStatus = Test-BrowserRunning
+        if ($browserStatus.Edge -or $browserStatus.Chrome) {
+            Write-BackupLog -Message "ブラウザを自動終了します..." -Level 'INFO'
+            $closedBrowsers = Close-Browsers
+            # ファイルロック解除のため少し待機
+            Start-Sleep -Seconds 2
+        }
+    }
+    else {
+        # 自動終了しない場合は警告
+        $browserStatus = Test-BrowserRunning
+        if ($browserStatus.Edge) {
+            Write-BackupLog -Message "警告: Microsoft Edge が起動中です。一部のファイルがコピーできない可能性があります" -Level 'WARNING'
+        }
+        if ($browserStatus.Chrome) {
+            Write-BackupLog -Message "警告: Google Chrome が起動中です。一部のファイルがコピーできない可能性があります" -Level 'WARNING'
+        }
+    }
 
     foreach ($item in $Script:BrowserData) {
         $sourcePath = Join-Path -Path $currentUserProfile -ChildPath $item.SourcePath
