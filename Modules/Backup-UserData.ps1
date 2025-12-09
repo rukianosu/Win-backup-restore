@@ -50,16 +50,59 @@ $Script:CloudDriveFolders = @(
     @{ Name = "GoogleDrive2"; FolderName = "GoogleDrive" }
 )
 
-$Script:BrowserBookmarks = @(
+#===============================================================================
+# ブラウザデータ定義（お気に入り、履歴、オートフィル、設定）
+#===============================================================================
+$Script:BrowserData = @(
+    # Microsoft Edge
     @{
-        Name       = "Microsoft Edge"
+        Name       = "Edge - お気に入り"
+        Browser    = "Edge"
         SourcePath = "AppData\Local\Microsoft\Edge\User Data\Default\Bookmarks"
         TargetPath = "AppData\Local\Microsoft\Edge\User Data\Default\Bookmarks"
     },
     @{
-        Name       = "Google Chrome"
+        Name       = "Edge - 閲覧履歴"
+        Browser    = "Edge"
+        SourcePath = "AppData\Local\Microsoft\Edge\User Data\Default\History"
+        TargetPath = "AppData\Local\Microsoft\Edge\User Data\Default\History"
+    },
+    @{
+        Name       = "Edge - オートフィル"
+        Browser    = "Edge"
+        SourcePath = "AppData\Local\Microsoft\Edge\User Data\Default\Web Data"
+        TargetPath = "AppData\Local\Microsoft\Edge\User Data\Default\Web Data"
+    },
+    @{
+        Name       = "Edge - 設定"
+        Browser    = "Edge"
+        SourcePath = "AppData\Local\Microsoft\Edge\User Data\Default\Preferences"
+        TargetPath = "AppData\Local\Microsoft\Edge\User Data\Default\Preferences"
+    },
+    # Google Chrome
+    @{
+        Name       = "Chrome - お気に入り"
+        Browser    = "Chrome"
         SourcePath = "AppData\Local\Google\Chrome\User Data\Default\Bookmarks"
         TargetPath = "AppData\Local\Google\Chrome\User Data\Default\Bookmarks"
+    },
+    @{
+        Name       = "Chrome - 閲覧履歴"
+        Browser    = "Chrome"
+        SourcePath = "AppData\Local\Google\Chrome\User Data\Default\History"
+        TargetPath = "AppData\Local\Google\Chrome\User Data\Default\History"
+    },
+    @{
+        Name       = "Chrome - オートフィル"
+        Browser    = "Chrome"
+        SourcePath = "AppData\Local\Google\Chrome\User Data\Default\Web Data"
+        TargetPath = "AppData\Local\Google\Chrome\User Data\Default\Web Data"
+    },
+    @{
+        Name       = "Chrome - 設定"
+        Browser    = "Chrome"
+        SourcePath = "AppData\Local\Google\Chrome\User Data\Default\Preferences"
+        TargetPath = "AppData\Local\Google\Chrome\User Data\Default\Preferences"
     }
 )
 
@@ -351,10 +394,11 @@ function Backup-CloudDriveFolders {
 }
 
 #===============================================================================
-# 関数: Backup-BrowserBookmarks
-# 説明: Edge/Chromeのブックマークをバックアップ
+# 関数: Backup-BrowserData
+# 説明: Edge/Chromeのブラウザデータをバックアップ
+#       （お気に入り、閲覧履歴、オートフィル、設定）
 #===============================================================================
-function Backup-BrowserBookmarks {
+function Backup-BrowserData {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -370,26 +414,27 @@ function Backup-BrowserBookmarks {
         Errors = 0
     }
 
-    # ブックマークバックアップオプションチェック
+    # ブラウザデータバックアップオプションチェック
     if ($Options.ContainsKey('BackupBookmarks') -and -not $Options['BackupBookmarks']) {
-        Write-BackupLog -Message "ブックマークバックアップがオプションでスキップされました" -Level 'SKIP'
+        Write-BackupLog -Message "ブラウザデータバックアップがオプションでスキップされました" -Level 'SKIP'
         return $results
     }
 
     $currentUserProfile = $env:USERPROFILE
 
-    Write-BackupLog -Message "=== ブラウザブックマークのバックアップ開始 ===" -Level 'INFO'
+    Write-BackupLog -Message "=== ブラウザデータのバックアップ開始 ===" -Level 'INFO'
+    Write-BackupLog -Message "（お気に入り、閲覧履歴、オートフィル、設定）" -Level 'INFO'
 
-    foreach ($browser in $Script:BrowserBookmarks) {
-        $sourcePath = Join-Path -Path $currentUserProfile -ChildPath $browser.SourcePath
+    foreach ($item in $Script:BrowserData) {
+        $sourcePath = Join-Path -Path $currentUserProfile -ChildPath $item.SourcePath
 
         if (-not (Test-Path -Path $sourcePath)) {
-            Write-BackupLog -Message "[$($browser.Name)] ブックマークが見つかりません" -Level 'SKIP'
+            Write-BackupLog -Message "[$($item.Name)] ファイルが見つかりません" -Level 'SKIP'
             $results.Skipped++
             continue
         }
 
-        $destPath = Join-Path -Path $BackupBasePath -ChildPath $browser.TargetPath
+        $destPath = Join-Path -Path $BackupBasePath -ChildPath $item.TargetPath
         $destDir = Split-Path -Path $destPath -Parent
 
         # 宛先ディレクトリ作成
@@ -399,16 +444,30 @@ function Backup-BrowserBookmarks {
 
         try {
             Copy-Item -Path $sourcePath -Destination $destPath -Force
-            Write-BackupLog -Message "[$($browser.Name)] ブックマークバックアップ完了" -Level 'SUCCESS'
+            Write-BackupLog -Message "[$($item.Name)] バックアップ完了" -Level 'SUCCESS'
             $results.Success++
         }
         catch {
-            Write-BackupLog -Message "[$($browser.Name)] ブックマークバックアップ失敗: $_" -Level 'ERROR'
+            Write-BackupLog -Message "[$($item.Name)] バックアップ失敗: $_" -Level 'ERROR'
             $results.Errors++
         }
     }
 
     return $results
+}
+
+# 後方互換性のためのエイリアス
+function Backup-BrowserBookmarks {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$BackupBasePath,
+
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Options
+    )
+
+    return Backup-BrowserData -BackupBasePath $BackupBasePath -Options $Options
 }
 
 #===============================================================================
