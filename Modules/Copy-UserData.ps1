@@ -403,24 +403,32 @@ function Copy-AllUserData {
     Write-RestoreLog -Message "対象ユーザー数: $($SelectedUsers.Count)" -Level 'INFO'
     Write-RestoreLog -Message "========================================" -Level 'INFO'
 
+    $userIndex = 0
     foreach ($user in $SelectedUsers) {
+        $userIndex++
         Write-Host ""
-        Write-RestoreLog -Message "--- ユーザー: $($user.UserName) の復元開始 ---" -Level 'INFO'
+        Write-RestoreLog -Message "--- ユーザー: $($user.UserName) の復元開始 ($userIndex/$($SelectedUsers.Count)) ---" -Level 'INFO'
         Write-RestoreLog -Message "ソースパス: $($user.UserFullPath)" -Level 'INFO'
 
         # 標準フォルダをコピー
+        Write-Host "  [1/3] 標準フォルダを復元中..." -ForegroundColor Cyan
+        Write-Progress -Activity "ユーザーデータ復元" -Status "標準フォルダ (Desktop, Documents等)..." -PercentComplete 20
         $standardResult = Copy-StandardFolders -SourceUserPath $user.UserFullPath -Options $Options
         $totalResults.Success += $standardResult.Success
         $totalResults.Skipped += $standardResult.Skipped
         $totalResults.Errors += $standardResult.Errors
 
         # AppDataフォルダをコピー
+        Write-Host "  [2/3] AppDataを復元中..." -ForegroundColor Cyan
+        Write-Progress -Activity "ユーザーデータ復元" -Status "AppData (辞書・テーマ)..." -PercentComplete 50
         $appDataResult = Copy-AppDataFolders -SourceUserPath $user.UserFullPath -Options $Options
         $totalResults.Success += $appDataResult.Success
         $totalResults.Skipped += $appDataResult.Skipped
         $totalResults.Errors += $appDataResult.Errors
 
         # クラウドドライブをコピー
+        Write-Host "  [3/3] クラウドドライブを復元中..." -ForegroundColor Cyan
+        Write-Progress -Activity "ユーザーデータ復元" -Status "クラウドドライブ (OneDrive等)..." -PercentComplete 80
         $cloudResult = Copy-CloudDriveFolders -SourceUserPath $user.UserFullPath -Options $Options
         $totalResults.Success += $cloudResult.Success
         $totalResults.Skipped += $cloudResult.Skipped
@@ -429,6 +437,8 @@ function Copy-AllUserData {
         Write-RestoreLog -Message "--- ユーザー: $($user.UserName) の復元完了 ---" -Level 'INFO'
     }
 
+    # プログレス完了
+    Write-Progress -Activity "ユーザーデータ復元" -Status "完了" -PercentComplete 100 -Completed
     Write-Host ""
     Write-RestoreLog -Message "========================================" -Level 'INFO'
     Write-RestoreLog -Message "ユーザーデータ復元処理完了" -Level 'INFO'

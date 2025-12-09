@@ -53,6 +53,73 @@ $Script:ScriptRoot = $PSScriptRoot
 $Script:LogPath = $LogPath
 
 #===============================================================================
+# 関数: Show-ProgressActivity
+# 説明: 処理中のアクティビティを表示
+#===============================================================================
+function Show-ProgressActivity {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Activity,
+
+        [Parameter(Mandatory = $false)]
+        [int]$Current = 0,
+
+        [Parameter(Mandatory = $false)]
+        [int]$Total = 0
+    )
+
+    $progressText = if ($Total -gt 0) {
+        "[$Current/$Total] $Activity"
+    } else {
+        $Activity
+    }
+
+    Write-Progress -Activity "復元処理中" -Status $progressText -PercentComplete (($Current / [Math]::Max($Total, 1)) * 100)
+}
+
+#===============================================================================
+# 関数: Play-CompletionSound
+# 説明: 完了音を鳴らす
+#===============================================================================
+function Play-CompletionSound {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $false)]
+        [ValidateSet('Success', 'Error', 'Warning')]
+        [string]$Type = 'Success'
+    )
+
+    try {
+        Add-Type -AssemblyName System.Windows.Forms -ErrorAction SilentlyContinue
+
+        switch ($Type) {
+            'Success' {
+                # 成功音（3回ビープ）
+                [Console]::Beep(800, 200)
+                Start-Sleep -Milliseconds 100
+                [Console]::Beep(1000, 200)
+                Start-Sleep -Milliseconds 100
+                [Console]::Beep(1200, 300)
+            }
+            'Error' {
+                # エラー音
+                [Console]::Beep(300, 500)
+                [System.Media.SystemSounds]::Hand.Play()
+            }
+            'Warning' {
+                # 警告音
+                [Console]::Beep(600, 300)
+                [System.Media.SystemSounds]::Exclamation.Play()
+            }
+        }
+    }
+    catch {
+        # 音が鳴らなくても続行
+    }
+}
+
+#===============================================================================
 # 関数: Write-MainLog
 # 説明: メインログ出力
 #===============================================================================
@@ -283,6 +350,7 @@ $(($selectedUsers | ForEach-Object { "  - $($_.UserName)" }) -join "`n")
     #---------------------------------------------------------------------------
     Write-Host ""
     Write-MainLog -Message "Step 3: ユーザーデータをコピー中..." -Level 'INFO'
+    Write-Progress -Activity "復元処理中" -Status "ユーザーデータをコピー中..." -PercentComplete 30
 
     $copyResults = Copy-AllUserData -SelectedUsers $selectedUsers -Options $options
 
@@ -291,6 +359,7 @@ $(($selectedUsers | ForEach-Object { "  - $($_.UserName)" }) -join "`n")
     #---------------------------------------------------------------------------
     Write-Host ""
     Write-MainLog -Message "Step 4: ブラウザブックマークを復元中..." -Level 'INFO'
+    Write-Progress -Activity "復元処理中" -Status "ブラウザデータを復元中..." -PercentComplete 60
 
     $bookmarkResults = Restore-AllBrowserBookmarks -SelectedUsers $selectedUsers -Options $options
 
@@ -299,8 +368,12 @@ $(($selectedUsers | ForEach-Object { "  - $($_.UserName)" }) -join "`n")
     #---------------------------------------------------------------------------
     Write-Host ""
     Write-MainLog -Message "Step 5: レジストリ設定を復元中..." -Level 'INFO'
+    Write-Progress -Activity "復元処理中" -Status "レジストリを復元中..." -PercentComplete 85
 
     $registryResults = Restore-UserRegistry -SelectedUsers $selectedUsers -Options $options
+
+    # プログレス完了
+    Write-Progress -Activity "復元処理中" -Status "完了" -PercentComplete 100 -Completed
 
     #---------------------------------------------------------------------------
     # 完了サマリー
@@ -325,6 +398,14 @@ $(($selectedUsers | ForEach-Object { "  - $($_.UserName)" }) -join "`n")
     Write-Host ""
     Write-MainLog -Message "ログファイル: $Script:LogPath" -Level 'INFO'
     Write-MainLog -Message "========================================" -Level 'INFO'
+
+    # 完了音を鳴らす
+    if ($totalErrors -gt 0) {
+        Play-CompletionSound -Type 'Warning'
+    }
+    else {
+        Play-CompletionSound -Type 'Success'
+    }
 
     # 完了ダイアログ
     if (-not $Silent) {
