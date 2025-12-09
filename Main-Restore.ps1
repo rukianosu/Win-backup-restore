@@ -87,41 +87,40 @@ function Write-MainLog {
 }
 
 #===============================================================================
-# 関数: Import-RestoreModules
-# 説明: 必要なモジュールを読み込み
+# モジュール読み込み（スクリプトレベルで実行）
 #===============================================================================
+$Script:ModulesPath = Join-Path -Path $Script:ScriptRoot -ChildPath "Modules"
+$Script:ModuleList = @(
+    "Scan-Backup.ps1",
+    "Restore-GUI.ps1",
+    "Copy-UserData.ps1",
+    "Restore-BrowserBookmarks.ps1",
+    "Restore-Registry.ps1"
+)
+
 function Import-RestoreModules {
     [CmdletBinding()]
     param()
 
     Write-MainLog -Message "モジュールを読み込み中..." -Level 'INFO'
 
-    $modulesPath = Join-Path -Path $Script:ScriptRoot -ChildPath "Modules"
-
-    $modules = @(
-        "Scan-Backup.ps1",
-        "Restore-GUI.ps1",
-        "Copy-UserData.ps1",
-        "Restore-BrowserBookmarks.ps1",
-        "Restore-Registry.ps1"
-    )
-
-    foreach ($module in $modules) {
-        $modulePath = Join-Path -Path $modulesPath -ChildPath $module
+    foreach ($module in $Script:ModuleList) {
+        $modulePath = Join-Path -Path $Script:ModulesPath -ChildPath $module
         if (Test-Path -Path $modulePath) {
-            try {
-                . $modulePath
-                Write-MainLog -Message "モジュール読み込み成功: $module" -Level 'SUCCESS'
-            }
-            catch {
-                Write-MainLog -Message "モジュール読み込み失敗: $module - $_" -Level 'ERROR'
-                throw "モジュールの読み込みに失敗しました: $module"
-            }
+            Write-MainLog -Message "モジュール読み込み成功: $module" -Level 'SUCCESS'
         }
         else {
             Write-MainLog -Message "モジュールが見つかりません: $modulePath" -Level 'ERROR'
             throw "モジュールが見つかりません: $modulePath"
         }
+    }
+}
+
+# スクリプトレベルでモジュールを読み込み（関数スコープ外）
+foreach ($module in $Script:ModuleList) {
+    $modulePath = Join-Path -Path $Script:ModulesPath -ChildPath $module
+    if (Test-Path -Path $modulePath) {
+        . $modulePath
     }
 }
 
