@@ -140,16 +140,43 @@ function Show-BackupDialog {
     #---------------------------------------------------------------------------
     $folderLabel = New-Object System.Windows.Forms.Label
     $folderLabel.Location = New-Object System.Drawing.Point(20, 160)
-    $folderLabel.Size = New-Object System.Drawing.Size(200, 20)
-    $folderLabel.Text = "バックアップフォルダ名:"
+    $folderLabel.Size = New-Object System.Drawing.Size(540, 20)
+    $folderLabel.Text = "バックアップフォルダ名（既存フォルダを選択 または 新規入力）:"
     $form.Controls.Add($folderLabel)
 
-    $folderTextBox = New-Object System.Windows.Forms.TextBox
-    $folderTextBox.Location = New-Object System.Drawing.Point(20, 185)
-    $folderTextBox.Size = New-Object System.Drawing.Size(300, 25)
-    $folderTextBox.Text = "Backup_$env:COMPUTERNAME`_$(Get-Date -Format 'yyyyMMdd')"
-    $folderTextBox.Font = New-Object System.Drawing.Font("Consolas", 10)
-    $form.Controls.Add($folderTextBox)
+    $folderComboBox = New-Object System.Windows.Forms.ComboBox
+    $folderComboBox.Location = New-Object System.Drawing.Point(20, 185)
+    $folderComboBox.Size = New-Object System.Drawing.Size(400, 25)
+    $folderComboBox.Font = New-Object System.Drawing.Font("Consolas", 10)
+    $folderComboBox.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDown
+    $form.Controls.Add($folderComboBox)
+
+    # 既存フォルダを検索してComboBoxに追加する関数
+    $script:UpdateExistingFolders = {
+        $folderComboBox.Items.Clear()
+        if ($driveListBox.SelectedIndex -ge 0 -and $script:DriveList.Count -gt 0) {
+            $selectedDrive = $script:DriveList[$driveListBox.SelectedIndex]
+            $drivePath = $selectedDrive.DriveLetter
+
+            # Backup_で始まるフォルダを検索
+            $existingFolders = Get-ChildItem -Path $drivePath -Directory -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -like "Backup_*" } |
+                Sort-Object -Property LastWriteTime -Descending |
+                Select-Object -ExpandProperty Name
+
+            if ($existingFolders) {
+                foreach ($folder in $existingFolders) {
+                    $folderComboBox.Items.Add($folder) | Out-Null
+                }
+                # 最新のフォルダを選択
+                $folderComboBox.SelectedIndex = 0
+            }
+            else {
+                # 既存フォルダがない場合は新規名を設定
+                $folderComboBox.Text = "Backup_$env:COMPUTERNAME"
+            }
+        }
+    }
 
     # パスプレビュー
     $pathPreviewLabel = New-Object System.Windows.Forms.Label
@@ -163,12 +190,30 @@ function Show-BackupDialog {
     $updatePreview = {
         if ($driveListBox.SelectedIndex -ge 0 -and $script:DriveList.Count -gt 0) {
             $selectedDrive = $script:DriveList[$driveListBox.SelectedIndex]
-            $pathPreviewLabel.Text = "保存先: $($selectedDrive.DriveLetter)\$($folderTextBox.Text)\Users\$env:USERNAME"
+            $folderName = $folderComboBox.Text
+            if ($folderName) {
+                $fullPath = Join-Path -Path $selectedDrive.DriveLetter -ChildPath $folderName
+                if (Test-Path -Path $fullPath) {
+                    $pathPreviewLabel.Text = "保存先: $($selectedDrive.DriveLetter)\$folderName\Users\$env:USERNAME （既存フォルダに追加）"
+                    $pathPreviewLabel.ForeColor = [System.Drawing.Color]::Green
+                }
+                else {
+                    $pathPreviewLabel.Text = "保存先: $($selectedDrive.DriveLetter)\$folderName\Users\$env:USERNAME （新規作成）"
+                    $pathPreviewLabel.ForeColor = [System.Drawing.Color]::Gray
+                }
+            }
         }
     }
 
-    $driveListBox.Add_SelectedIndexChanged($updatePreview)
-    $folderTextBox.Add_TextChanged($updatePreview)
+    $driveListBox.Add_SelectedIndexChanged({
+        & $script:UpdateExistingFolders
+        & $updatePreview
+    })
+    $folderComboBox.Add_TextChanged($updatePreview)
+    $folderComboBox.Add_SelectedIndexChanged($updatePreview)
+
+    # 初期化
+    & $script:UpdateExistingFolders
     & $updatePreview
 
     #---------------------------------------------------------------------------
@@ -280,7 +325,7 @@ function Show-BackupDialog {
         }
 
         # フォルダ名チェック
-        if ([string]::IsNullOrWhiteSpace($folderTextBox.Text)) {
+        if ([string]::IsNullOrWhiteSpace($folderComboBox.Text)) {
             [System.Windows.Forms.MessageBox]::Show(
                 "バックアップフォルダ名を入力してください",
                 "入力エラー",
@@ -292,7 +337,7 @@ function Show-BackupDialog {
 
         # 選択されたドライブ
         $script:BackupDialogResult.TargetDrive = $script:DriveList[$driveListBox.SelectedIndex]
-        $script:BackupDialogResult.BackupFolderName = $folderTextBox.Text
+        $script:BackupDialogResult.BackupFolderName = $folderComboBox.Text
 
         # オプションを格納
         foreach ($cb in $checkboxes) {
