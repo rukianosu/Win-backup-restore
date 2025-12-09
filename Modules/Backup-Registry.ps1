@@ -250,7 +250,7 @@ reg import <ファイル名.reg> コマンドで復元できます。
         Write-RegistryBackupLog -Message "情報ファイル作成失敗: $_" -Level 'WARNING'
     }
 
-    Write-RegistryBackupLog -Message "" -Level 'INFO'
+    Write-Host ""
     Write-RegistryBackupLog -Message "========================================" -Level 'INFO'
     Write-RegistryBackupLog -Message "レジストリバックアップ完了" -Level 'INFO'
     Write-RegistryBackupLog -Message "成功: $($results.Success), スキップ: $($results.Skipped), エラー: $($results.Errors)" -Level 'INFO'

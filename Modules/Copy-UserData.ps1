@@ -402,7 +402,7 @@ function Copy-AllUserData {
     Write-RestoreLog -Message "========================================" -Level 'INFO'
 
     foreach ($user in $SelectedUsers) {
-        Write-RestoreLog -Message "" -Level 'INFO'
+        Write-Host ""
         Write-RestoreLog -Message "--- ユーザー: $($user.UserName) の復元開始 ---" -Level 'INFO'
         Write-RestoreLog -Message "ソースパス: $($user.UserFullPath)" -Level 'INFO'
 
@@ -427,7 +427,7 @@ function Copy-AllUserData {
         Write-RestoreLog -Message "--- ユーザー: $($user.UserName) の復元完了 ---" -Level 'INFO'
     }
 
-    Write-RestoreLog -Message "" -Level 'INFO'
+    Write-Host ""
     Write-RestoreLog -Message "========================================" -Level 'INFO'
     Write-RestoreLog -Message "ユーザーデータ復元処理完了" -Level 'INFO'
     Write-RestoreLog -Message "成功: $($totalResults.Success), スキップ: $($totalResults.Skipped), エラー: $($totalResults.Errors)" -Level 'INFO'

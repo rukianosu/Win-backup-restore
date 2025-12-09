@@ -389,7 +389,7 @@ function Restore-UserRegistry {
     Write-RegistryLog -Message "========================================" -Level 'INFO'
 
     foreach ($user in $SelectedUsers) {
-        Write-RegistryLog -Message "" -Level 'INFO'
+        Write-Host ""
         Write-RegistryLog -Message "--- ユーザー: $($user.UserName) のレジストリ復元 ---" -Level 'INFO'
 
         # レジストリハイブをマウント
@@ -427,7 +427,7 @@ function Restore-UserRegistry {
         }
     }
 
-    Write-RegistryLog -Message "" -Level 'INFO'
+    Write-Host ""
     Write-RegistryLog -Message "========================================" -Level 'INFO'
     Write-RegistryLog -Message "レジストリ復元完了" -Level 'INFO'
     Write-RegistryLog -Message "成功: $($totalResults.Success), スキップ: $($totalResults.Skipped), エラー: $($totalResults.Errors)" -Level 'INFO'

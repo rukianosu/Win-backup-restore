@@ -395,7 +395,7 @@ function Backup-CloudDriveFolders {
 
 #===============================================================================
 # 関数: Close-Browsers
-# 説明: Edge/Chromeを終了する
+# 説明: Edge/Chromeを終了する（バックグラウンドプロセスも含む）
 #===============================================================================
 function Close-Browsers {
     [CmdletBinding()]
@@ -406,19 +406,24 @@ function Close-Browsers {
         Chrome = $false
     }
 
-    # Microsoft Edge を終了
-    $edgeProcesses = Get-Process -Name "msedge" -ErrorAction SilentlyContinue
+    # Microsoft Edge を終了（関連プロセスもすべて終了）
+    $edgeProcessNames = @("msedge", "msedgewebview2", "MicrosoftEdgeUpdate")
+    $edgeProcesses = Get-Process -Name $edgeProcessNames -ErrorAction SilentlyContinue
     if ($edgeProcesses) {
         Write-BackupLog -Message "Microsoft Edge を終了中..." -Level 'INFO'
         try {
-            $edgeProcesses | ForEach-Object { $_.CloseMainWindow() | Out-Null }
-            Start-Sleep -Seconds 2
+            # まず通常終了を試みる
+            $mainEdge = Get-Process -Name "msedge" -ErrorAction SilentlyContinue
+            if ($mainEdge) {
+                $mainEdge | ForEach-Object { $_.CloseMainWindow() | Out-Null }
+                Start-Sleep -Seconds 3
+            }
 
-            # まだ残っていたら強制終了
-            $edgeProcesses = Get-Process -Name "msedge" -ErrorAction SilentlyContinue
-            if ($edgeProcesses) {
-                $edgeProcesses | Stop-Process -Force -ErrorAction SilentlyContinue
-                Start-Sleep -Seconds 1
+            # 残っているプロセスを強制終了
+            $remainingEdge = Get-Process -Name $edgeProcessNames -ErrorAction SilentlyContinue
+            if ($remainingEdge) {
+                $remainingEdge | Stop-Process -Force -ErrorAction SilentlyContinue
+                Start-Sleep -Seconds 2
             }
             Write-BackupLog -Message "Microsoft Edge を終了しました" -Level 'SUCCESS'
             $closed.Edge = $true
@@ -428,19 +433,24 @@ function Close-Browsers {
         }
     }
 
-    # Google Chrome を終了
-    $chromeProcesses = Get-Process -Name "chrome" -ErrorAction SilentlyContinue
+    # Google Chrome を終了（関連プロセスもすべて終了）
+    $chromeProcessNames = @("chrome", "GoogleUpdate", "GoogleCrashHandler", "GoogleCrashHandler64")
+    $chromeProcesses = Get-Process -Name $chromeProcessNames -ErrorAction SilentlyContinue
     if ($chromeProcesses) {
         Write-BackupLog -Message "Google Chrome を終了中..." -Level 'INFO'
         try {
-            $chromeProcesses | ForEach-Object { $_.CloseMainWindow() | Out-Null }
-            Start-Sleep -Seconds 2
+            # まず通常終了を試みる
+            $mainChrome = Get-Process -Name "chrome" -ErrorAction SilentlyContinue
+            if ($mainChrome) {
+                $mainChrome | ForEach-Object { $_.CloseMainWindow() | Out-Null }
+                Start-Sleep -Seconds 3
+            }
 
-            # まだ残っていたら強制終了
-            $chromeProcesses = Get-Process -Name "chrome" -ErrorAction SilentlyContinue
-            if ($chromeProcesses) {
-                $chromeProcesses | Stop-Process -Force -ErrorAction SilentlyContinue
-                Start-Sleep -Seconds 1
+            # 残っているプロセスを強制終了
+            $remainingChrome = Get-Process -Name $chromeProcessNames -ErrorAction SilentlyContinue
+            if ($remainingChrome) {
+                $remainingChrome | Stop-Process -Force -ErrorAction SilentlyContinue
+                Start-Sleep -Seconds 2
             }
             Write-BackupLog -Message "Google Chrome を終了しました" -Level 'SUCCESS'
             $closed.Chrome = $true
@@ -448,6 +458,12 @@ function Close-Browsers {
         catch {
             Write-BackupLog -Message "Google Chrome の終了に失敗: $_" -Level 'WARNING'
         }
+    }
+
+    # 追加の待機（ファイルロック解除のため）
+    if ($closed.Edge -or $closed.Chrome) {
+        Write-BackupLog -Message "ファイルロック解除を待機中..." -Level 'INFO'
+        Start-Sleep -Seconds 3
     }
 
     return $closed
@@ -619,7 +635,7 @@ function Backup-AllUserData {
     $totalResults.Skipped += $bookmarkResult.Skipped
     $totalResults.Errors += $bookmarkResult.Errors
 
-    Write-BackupLog -Message "" -Level 'INFO'
+    Write-Host ""
     Write-BackupLog -Message "========================================" -Level 'INFO'
     Write-BackupLog -Message "ユーザーデータバックアップ処理完了" -Level 'INFO'
     Write-BackupLog -Message "成功: $($totalResults.Success), スキップ: $($totalResults.Skipped), エラー: $($totalResults.Errors)" -Level 'INFO'
