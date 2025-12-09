@@ -50,6 +50,122 @@ $Script:ScriptRoot = $PSScriptRoot
 # ログパスをグローバルに設定
 $Script:LogPath = $LogPath
 
+# 進行状況スピナー用
+$Script:SpinnerRunning = $false
+$Script:SpinnerJob = $null
+
+#===============================================================================
+# 関数: Start-ProgressSpinner
+# 説明: 進行状況スピナーを開始
+#===============================================================================
+function Start-ProgressSpinner {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $false)]
+        [string]$Message = "処理中"
+    )
+
+    $Script:SpinnerRunning = $true
+    $spinChars = @('|', '/', '-', '\')
+    $i = 0
+
+    # バックグラウンドで回転表示
+    $Script:SpinnerJob = Start-Job -ScriptBlock {
+        param($msg, $chars)
+        $i = 0
+        while ($true) {
+            $char = $chars[$i % 4]
+            Write-Host "`r  $char $msg $char  " -NoNewline -ForegroundColor Cyan
+            Start-Sleep -Milliseconds 200
+            $i++
+        }
+    } -ArgumentList $Message, $spinChars
+}
+
+#===============================================================================
+# 関数: Stop-ProgressSpinner
+# 説明: 進行状況スピナーを停止
+#===============================================================================
+function Stop-ProgressSpinner {
+    [CmdletBinding()]
+    param()
+
+    if ($Script:SpinnerJob) {
+        Stop-Job -Job $Script:SpinnerJob -ErrorAction SilentlyContinue
+        Remove-Job -Job $Script:SpinnerJob -Force -ErrorAction SilentlyContinue
+        $Script:SpinnerJob = $null
+    }
+    Write-Host "`r                                        `r" -NoNewline
+}
+
+#===============================================================================
+# 関数: Show-ProgressActivity
+# 説明: 処理中のアクティビティを表示（シンプル版）
+#===============================================================================
+function Show-ProgressActivity {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Activity,
+
+        [Parameter(Mandatory = $false)]
+        [int]$Current = 0,
+
+        [Parameter(Mandatory = $false)]
+        [int]$Total = 0
+    )
+
+    $progressText = if ($Total -gt 0) {
+        "[$Current/$Total] $Activity"
+    } else {
+        $Activity
+    }
+
+    # プログレスバー表示
+    Write-Progress -Activity "バックアップ処理中" -Status $progressText -PercentComplete (($Current / [Math]::Max($Total, 1)) * 100)
+}
+
+#===============================================================================
+# 関数: Play-CompletionSound
+# 説明: 完了音を鳴らす
+#===============================================================================
+function Play-CompletionSound {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $false)]
+        [ValidateSet('Success', 'Error', 'Warning')]
+        [string]$Type = 'Success'
+    )
+
+    try {
+        Add-Type -AssemblyName System.Windows.Forms -ErrorAction SilentlyContinue
+
+        switch ($Type) {
+            'Success' {
+                # 成功音（3回ビープ）
+                [Console]::Beep(800, 200)
+                Start-Sleep -Milliseconds 100
+                [Console]::Beep(1000, 200)
+                Start-Sleep -Milliseconds 100
+                [Console]::Beep(1200, 300)
+            }
+            'Error' {
+                # エラー音
+                [Console]::Beep(300, 500)
+                [System.Media.SystemSounds]::Hand.Play()
+            }
+            'Warning' {
+                # 警告音
+                [Console]::Beep(600, 300)
+                [System.Media.SystemSounds]::Exclamation.Play()
+            }
+        }
+    }
+    catch {
+        # 音が鳴らなくても続行
+    }
+}
+
 #===============================================================================
 # 関数: Write-MainLog
 # 説明: メインログ出力
@@ -280,6 +396,7 @@ function Start-BackupProcess {
     #---------------------------------------------------------------------------
     Write-Host ""
     Write-MainLog -Message "Step 2: ユーザーデータをバックアップ中..." -Level 'INFO'
+    Write-Progress -Activity "バックアップ処理中" -Status "ユーザーデータをバックアップ中..." -PercentComplete 30
 
     $dataResults = Backup-AllUserData -BackupBasePath $backupUserPath -Options $options
 
@@ -288,8 +405,12 @@ function Start-BackupProcess {
     #---------------------------------------------------------------------------
     Write-Host ""
     Write-MainLog -Message "Step 3: レジストリ設定をバックアップ中..." -Level 'INFO'
+    Write-Progress -Activity "バックアップ処理中" -Status "レジストリをバックアップ中..." -PercentComplete 80
 
     $registryResults = Backup-UserRegistry -BackupBasePath $backupUserPath -Options $options
+
+    # プログレス完了
+    Write-Progress -Activity "バックアップ処理中" -Status "完了" -PercentComplete 100 -Completed
 
     #---------------------------------------------------------------------------
     # 完了サマリー
@@ -315,6 +436,14 @@ function Start-BackupProcess {
     Write-MainLog -Message "バックアップ先: $backupUserPath" -Level 'INFO'
     Write-MainLog -Message "ログファイル: $Script:LogPath" -Level 'INFO'
     Write-MainLog -Message "========================================" -Level 'INFO'
+
+    # 完了音を鳴らす
+    if ($totalErrors -gt 0) {
+        Play-CompletionSound -Type 'Warning'
+    }
+    else {
+        Play-CompletionSound -Type 'Success'
+    }
 
     # 完了ダイアログ
     if (-not $Silent) {

@@ -615,29 +615,45 @@ function Backup-AllUserData {
     Write-BackupLog -Message "========================================" -Level 'INFO'
 
     # 標準フォルダをバックアップ
+    Write-Host "`n  [1/5] 標準フォルダをバックアップ中..." -ForegroundColor Cyan
+    Write-Progress -Activity "ユーザーデータバックアップ" -Status "標準フォルダ (Desktop, Documents等)..." -PercentComplete 10
     $standardResult = Backup-StandardFolders -BackupBasePath $BackupBasePath -Options $Options
     $totalResults.Success += $standardResult.Success
     $totalResults.Skipped += $standardResult.Skipped
     $totalResults.Errors += $standardResult.Errors
 
     # AppDataフォルダをバックアップ
+    Write-Host "  [2/5] AppDataをバックアップ中..." -ForegroundColor Cyan
+    Write-Progress -Activity "ユーザーデータバックアップ" -Status "AppData (辞書・テーマ)..." -PercentComplete 30
     $appDataResult = Backup-AppDataFolders -BackupBasePath $BackupBasePath -Options $Options
     $totalResults.Success += $appDataResult.Success
     $totalResults.Skipped += $appDataResult.Skipped
     $totalResults.Errors += $appDataResult.Errors
 
     # クラウドドライブをバックアップ
+    Write-Host "  [3/5] クラウドドライブをバックアップ中..." -ForegroundColor Cyan
+    Write-Progress -Activity "ユーザーデータバックアップ" -Status "クラウドドライブ (OneDrive等)..." -PercentComplete 50
     $cloudResult = Backup-CloudDriveFolders -BackupBasePath $BackupBasePath -Options $Options
     $totalResults.Success += $cloudResult.Success
     $totalResults.Skipped += $cloudResult.Skipped
     $totalResults.Errors += $cloudResult.Errors
 
+    # ブラウザ終了（オプション）
+    if ($Options.ContainsKey('CloseBrowsers') -and $Options['CloseBrowsers']) {
+        Write-Host "  [4/5] ブラウザを終了中..." -ForegroundColor Cyan
+        Write-Progress -Activity "ユーザーデータバックアップ" -Status "ブラウザを終了中..." -PercentComplete 65
+    }
+
     # ブックマークをバックアップ
+    Write-Host "  [5/5] ブラウザデータをバックアップ中..." -ForegroundColor Cyan
+    Write-Progress -Activity "ユーザーデータバックアップ" -Status "ブラウザデータ (履歴・お気に入り等)..." -PercentComplete 75
     $bookmarkResult = Backup-BrowserBookmarks -BackupBasePath $BackupBasePath -Options $Options
     $totalResults.Success += $bookmarkResult.Success
     $totalResults.Skipped += $bookmarkResult.Skipped
     $totalResults.Errors += $bookmarkResult.Errors
 
+    # プログレス完了
+    Write-Progress -Activity "ユーザーデータバックアップ" -Status "完了" -PercentComplete 100 -Completed
     Write-Host ""
     Write-BackupLog -Message "========================================" -Level 'INFO'
     Write-BackupLog -Message "ユーザーデータバックアップ処理完了" -Level 'INFO'
