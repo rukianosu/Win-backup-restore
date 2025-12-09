@@ -221,14 +221,41 @@ function Start-BackupProcess {
     $backupBasePath = Join-Path -Path $targetDrive.DriveLetter -ChildPath $backupFolderName
     $backupUserPath = Join-Path -Path $backupBasePath -ChildPath "Users\$env:USERNAME"
 
+    # 既存バックアップかどうか確認
+    $isResume = Test-Path -Path $backupBasePath
+    $backupMode = if ($isResume) { "レジューム（差分バックアップ）" } else { "新規バックアップ" }
+
     Write-MainLog -Message "バックアップ先: $backupUserPath" -Level 'INFO'
+    Write-MainLog -Message "モード: $backupMode" -Level 'INFO'
 
     #---------------------------------------------------------------------------
     # Step 2: バックアップ確認
     #---------------------------------------------------------------------------
     if (-not $Silent) {
-        $confirmMessage = @"
-以下のバックアップを実行します:
+        if ($isResume) {
+            $confirmMessage = @"
+【レジューム（続き）モード】
+
+既存のバックアップフォルダが見つかりました。
+変更・追加されたファイルのみバックアップします。
+
+バックアップ元: $env:USERPROFILE
+バックアップ先: $backupUserPath
+
+空き容量: $($targetDrive.FreeSpaceGB) GB
+
+※ 同じファイルはスキップされます（高速）
+※ 中断しても再実行で続きから再開できます
+
+続行しますか?
+"@
+            $dialogTitle = "レジューム確認"
+        }
+        else {
+            $confirmMessage = @"
+【新規バックアップモード】
+
+新しいバックアップフォルダを作成します。
 
 バックアップ元: $env:USERPROFILE
 バックアップ先: $backupUserPath
@@ -237,7 +264,10 @@ function Start-BackupProcess {
 
 続行しますか?
 "@
-        $confirmed = Show-BackupConfirmDialog -Message $confirmMessage -Title "バックアップ確認"
+            $dialogTitle = "新規バックアップ確認"
+        }
+
+        $confirmed = Show-BackupConfirmDialog -Message $confirmMessage -Title $dialogTitle
 
         if (-not $confirmed) {
             Write-MainLog -Message "ユーザーがバックアップをキャンセルしました" -Level 'WARNING'
