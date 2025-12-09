@@ -186,7 +186,7 @@ function Start-RestoreProcess {
     #---------------------------------------------------------------------------
     # Step 1: バックアップドライブをスキャン
     #---------------------------------------------------------------------------
-    Write-MainLog -Message "" -Level 'INFO'
+    Write-Host ""
     Write-MainLog -Message "Step 1: バックアップドライブをスキャン中..." -Level 'INFO'
 
     $backupUsers = Scan-AllBackupDrives
@@ -212,7 +212,7 @@ function Start-RestoreProcess {
     #---------------------------------------------------------------------------
     # Step 2: ユーザー選択（GUIまたは全選択）
     #---------------------------------------------------------------------------
-    Write-MainLog -Message "" -Level 'INFO'
+    Write-Host ""
     Write-MainLog -Message "Step 2: ユーザー選択..." -Level 'INFO'
 
     $selectedUsers = @()
@@ -282,7 +282,7 @@ $(($selectedUsers | ForEach-Object { "  - $($_.UserName)" }) -join "`n")
     #---------------------------------------------------------------------------
     # Step 4: ユーザーデータをコピー
     #---------------------------------------------------------------------------
-    Write-MainLog -Message "" -Level 'INFO'
+    Write-Host ""
     Write-MainLog -Message "Step 3: ユーザーデータをコピー中..." -Level 'INFO'
 
     $copyResults = Copy-AllUserData -SelectedUsers $selectedUsers -Options $options
@@ -290,7 +290,7 @@ $(($selectedUsers | ForEach-Object { "  - $($_.UserName)" }) -join "`n")
     #---------------------------------------------------------------------------
     # Step 5: ブラウザブックマークを復元
     #---------------------------------------------------------------------------
-    Write-MainLog -Message "" -Level 'INFO'
+    Write-Host ""
     Write-MainLog -Message "Step 4: ブラウザブックマークを復元中..." -Level 'INFO'
 
     $bookmarkResults = Restore-AllBrowserBookmarks -SelectedUsers $selectedUsers -Options $options
@@ -298,7 +298,7 @@ $(($selectedUsers | ForEach-Object { "  - $($_.UserName)" }) -join "`n")
     #---------------------------------------------------------------------------
     # Step 6: レジストリを復元
     #---------------------------------------------------------------------------
-    Write-MainLog -Message "" -Level 'INFO'
+    Write-Host ""
     Write-MainLog -Message "Step 5: レジストリ設定を復元中..." -Level 'INFO'
 
     $registryResults = Restore-UserRegistry -SelectedUsers $selectedUsers -Options $options
@@ -313,17 +313,17 @@ $(($selectedUsers | ForEach-Object { "  - $($_.UserName)" }) -join "`n")
     $endTime = Get-Date
     $duration = $endTime - $Script:StartTime
 
-    Write-MainLog -Message "" -Level 'INFO'
+    Write-Host ""
     Write-MainLog -Message "========================================" -Level 'INFO'
     Write-MainLog -Message "復元処理完了" -Level 'SUCCESS'
     Write-MainLog -Message "========================================" -Level 'INFO'
     Write-MainLog -Message "処理時間: $($duration.ToString('hh\:mm\:ss'))" -Level 'INFO'
-    Write-MainLog -Message "" -Level 'INFO'
+    Write-Host ""
     Write-MainLog -Message "[サマリー]" -Level 'INFO'
     Write-MainLog -Message "  成功:     $totalSuccess 項目" -Level 'SUCCESS'
     Write-MainLog -Message "  スキップ: $totalSkipped 項目" -Level 'WARNING'
     Write-MainLog -Message "  エラー:   $totalErrors 項目" -Level $(if ($totalErrors -gt 0) { 'ERROR' } else { 'INFO' })
-    Write-MainLog -Message "" -Level 'INFO'
+    Write-Host ""
     Write-MainLog -Message "ログファイル: $Script:LogPath" -Level 'INFO'
     Write-MainLog -Message "========================================" -Level 'INFO'
 
