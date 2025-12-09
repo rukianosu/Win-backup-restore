@@ -146,13 +146,15 @@ function Invoke-RobocopyWithLog {
             "`"$Source`"",
             "`"$Destination`"",
             "/E",
+            "/Z",           # 再開可能モード（中断しても続きから）
             "/COPY:DAT",
+            "/DCOPY:T",     # ディレクトリのタイムスタンプもコピー
             "/R:3",
             "/W:5",
             "/MT:8",
             "/NP",
             "/XJ",
-            "/XO"  # 新しいファイルのみコピー（上書き保護）
+            "/XO"           # 新しいファイルのみコピー（上書き保護）
         )
 
         # Mirrorモードの場合は /MIR を追加（削除も行う）
