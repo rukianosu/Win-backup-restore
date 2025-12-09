@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     WinForms GUIでバックアップユーザーを選択するモジュール
 

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Edge/Chromeのブラウザデータを復元するモジュール
 

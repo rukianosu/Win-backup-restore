@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     WinForms GUIでバックアップ先と対象を選択するモジュール
 
