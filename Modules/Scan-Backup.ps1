@@ -93,16 +93,23 @@ function Find-UsersFolder {
 
     Write-Verbose "ドライブ $DriveLetter 内のUsersフォルダを検索中..."
 
+    # 検索対象のフォルダ名パターン（大文字小文字、日本語対応）
+    $usersFolderNames = @("Users", "users", "User", "user", "ユーザー")
+
     # 検索対象のパスパターン（Windowsバックアップの一般的な構造）
     # R-Studio等のデータ復旧ソフトで救出した場合、深い階層にある可能性あり
-    $searchPaths = @(
-        "$DriveLetter\Users",                          # 直接Users
-        "$DriveLetter\Backup\Users",                   # Backupフォルダ内
-        "$DriveLetter\WindowsBackup\Users",            # WindowsBackup内
-        "$DriveLetter\*\Users",                        # 1階層下
-        "$DriveLetter\*\*\Users",                      # 2階層下
-        "$DriveLetter\*\*\*\Users"                     # 3階層下（R-Studio復旧等）
-    )
+    $searchPaths = @()
+
+    foreach ($folderName in $usersFolderNames) {
+        $searchPaths += @(
+            "$DriveLetter\$folderName",                    # 直接
+            "$DriveLetter\Backup\$folderName",             # Backupフォルダ内
+            "$DriveLetter\WindowsBackup\$folderName",      # WindowsBackup内
+            "$DriveLetter\*\$folderName",                  # 1階層下
+            "$DriveLetter\*\*\$folderName",                # 2階層下
+            "$DriveLetter\*\*\*\$folderName"               # 3階層下（R-Studio復旧等）
+        )
+    }
 
     $foundPaths = @()
 
@@ -132,6 +139,87 @@ function Find-UsersFolder {
     }
 
     return $foundPaths | Select-Object -Unique
+}
+
+#===============================================================================
+# 関数: Test-IsUserProfileFolder
+# 説明: 指定フォルダがユーザープロファイルフォルダかチェック
+#       （Desktop, Documents, AppData等が存在するか確認）
+#===============================================================================
+function Test-IsUserProfileFolder {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FolderPath
+    )
+
+    if (-not (Test-Path -Path $FolderPath -PathType Container)) {
+        return $false
+    }
+
+    # ユーザープロファイルに典型的なフォルダをチェック
+    $profileIndicators = @("Desktop", "Documents", "AppData")
+    $foundCount = 0
+
+    foreach ($indicator in $profileIndicators) {
+        $checkPath = Join-Path -Path $FolderPath -ChildPath $indicator
+        if (Test-Path -Path $checkPath -PathType Container) {
+            $foundCount++
+        }
+    }
+
+    # 2つ以上あればユーザープロファイルと判定
+    return ($foundCount -ge 2)
+}
+
+#===============================================================================
+# 関数: Find-DirectUserProfiles
+# 説明: Usersフォルダなしで直接ユーザープロファイルを検索
+#       （R-Studioで復旧した場合等に対応）
+#===============================================================================
+function Find-DirectUserProfiles {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$DriveLetter
+    )
+
+    Write-Verbose "直接ユーザープロファイルを検索中..."
+
+    $foundProfiles = @()
+
+    # 3階層下まで検索（時間がかかる可能性あり）
+    $searchDepths = @(
+        "$DriveLetter\*",
+        "$DriveLetter\*\*",
+        "$DriveLetter\*\*\*"
+    )
+
+    foreach ($pattern in $searchDepths) {
+        try {
+            $folders = Get-ChildItem -Path $pattern -Directory -ErrorAction SilentlyContinue
+            foreach ($folder in $folders) {
+                # システムフォルダや除外フォルダをスキップ
+                if ($folder.Name -in $Script:ExcludedUsers) { continue }
+                if ($folder.Name -like '$*') { continue }  # $RECYCLE.BIN等
+                if ($folder.Name -eq 'System Volume Information') { continue }
+                if ($folder.Name -eq 'Windows') { continue }
+                if ($folder.Name -eq 'Program Files') { continue }
+                if ($folder.Name -eq 'Program Files (x86)') { continue }
+
+                # ユーザープロファイルかチェック
+                if (Test-IsUserProfileFolder -FolderPath $folder.FullName) {
+                    Write-Verbose "直接ユーザープロファイル発見: $($folder.FullName)"
+                    $foundProfiles += $folder.FullName
+                }
+            }
+        }
+        catch {
+            Write-Verbose "検索エラー ($pattern): $_"
+        }
+    }
+
+    return $foundProfiles | Select-Object -Unique
 }
 
 #===============================================================================
@@ -190,6 +278,29 @@ function Get-BackupUsers {
 }
 
 #===============================================================================
+# 関数: Show-ManualPathDialog
+# 説明: 手動でユーザーフォルダを指定するダイアログ
+#===============================================================================
+function Show-ManualPathDialog {
+    [CmdletBinding()]
+    param()
+
+    Add-Type -AssemblyName System.Windows.Forms
+
+    $folderBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
+    $folderBrowser.Description = "ユーザープロファイルフォルダを選択してください`n（Desktop, Documents等があるフォルダ）"
+    $folderBrowser.ShowNewFolderButton = $false
+
+    $result = $folderBrowser.ShowDialog()
+
+    if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
+        return $folderBrowser.SelectedPath
+    }
+
+    return $null
+}
+
+#===============================================================================
 # 関数: Scan-AllBackupDrives
 # 説明: すべての外付けドライブをスキャンし、バックアップユーザーを一覧化
 #===============================================================================
@@ -221,6 +332,7 @@ function Scan-AllBackupDrives {
     foreach ($drive in $drives) {
         Write-Host "`n$($drive.DriveLetter) をスキャン中..." -ForegroundColor Yellow
 
+        # 1. まずUsersフォルダを検索
         $usersFolders = Find-UsersFolder -DriveLetter $drive.DriveLetter
 
         foreach ($usersPath in $usersFolders) {
@@ -252,11 +364,87 @@ function Scan-AllBackupDrives {
                 Write-Host "      フォルダ: $($status -join ', ')" -ForegroundColor Gray
             }
         }
+
+        # 2. Usersフォルダが見つからない場合、直接ユーザープロファイルを検索
+        if ($usersFolders.Count -eq 0) {
+            Write-Host "  Usersフォルダが見つかりません。直接ユーザープロファイルを検索中..." -ForegroundColor Yellow
+
+            $directProfiles = Find-DirectUserProfiles -DriveLetter $drive.DriveLetter
+
+            foreach ($profilePath in $directProfiles) {
+                $folderName = Split-Path -Path $profilePath -Leaf
+                $parentPath = Split-Path -Path $profilePath -Parent
+
+                Write-Host "  直接ユーザープロファイル発見: $profilePath" -ForegroundColor Green
+
+                $results += [PSCustomObject]@{
+                    DriveLetter    = $drive.DriveLetter
+                    VolumeName     = $drive.VolumeName
+                    UsersPath      = $parentPath
+                    UserName       = $folderName
+                    UserFullPath   = $profilePath
+                    LastWriteTime  = (Get-Item $profilePath).LastWriteTime
+                    HasDesktop     = Test-Path (Join-Path $profilePath 'Desktop')
+                    HasDocuments   = Test-Path (Join-Path $profilePath 'Documents')
+                    HasAppData     = Test-Path (Join-Path $profilePath 'AppData')
+                }
+
+                Write-Host "    [ユーザー] $folderName" -ForegroundColor Cyan
+            }
+        }
     }
 
     Write-Host "`n========================================" -ForegroundColor Cyan
     Write-Host " スキャン完了: $($results.Count) ユーザー検出" -ForegroundColor Cyan
     Write-Host "========================================" -ForegroundColor Cyan
+
+    # 3. 見つからない場合、手動指定オプションを提示
+    if ($results.Count -eq 0) {
+        Write-Host "`n[情報] ユーザーフォルダが自動検出できませんでした" -ForegroundColor Yellow
+
+        Add-Type -AssemblyName System.Windows.Forms
+        $dialogResult = [System.Windows.Forms.MessageBox]::Show(
+            "ユーザーフォルダが自動検出できませんでした。`n`n手動でユーザープロファイルフォルダを指定しますか？`n（Desktop, Documents等があるフォルダを選択）",
+            "手動指定",
+            [System.Windows.Forms.MessageBoxButtons]::YesNo,
+            [System.Windows.Forms.MessageBoxIcon]::Question
+        )
+
+        if ($dialogResult -eq [System.Windows.Forms.DialogResult]::Yes) {
+            $manualPath = Show-ManualPathDialog
+
+            if ($manualPath -and (Test-Path $manualPath)) {
+                # 手動指定されたパスがユーザープロファイルかチェック
+                if (Test-IsUserProfileFolder -FolderPath $manualPath) {
+                    $folderName = Split-Path -Path $manualPath -Leaf
+                    $parentPath = Split-Path -Path $manualPath -Parent
+                    $driveLetter = (Split-Path -Path $manualPath -Qualifier)
+
+                    Write-Host "`n手動指定されたユーザープロファイル: $manualPath" -ForegroundColor Green
+
+                    $results += [PSCustomObject]@{
+                        DriveLetter    = $driveLetter
+                        VolumeName     = "(手動指定)"
+                        UsersPath      = $parentPath
+                        UserName       = $folderName
+                        UserFullPath   = $manualPath
+                        LastWriteTime  = (Get-Item $manualPath).LastWriteTime
+                        HasDesktop     = Test-Path (Join-Path $manualPath 'Desktop')
+                        HasDocuments   = Test-Path (Join-Path $manualPath 'Documents')
+                        HasAppData     = Test-Path (Join-Path $manualPath 'AppData')
+                    }
+                }
+                else {
+                    [System.Windows.Forms.MessageBox]::Show(
+                        "指定されたフォルダはユーザープロファイルではないようです。`n`nDesktop, Documents, AppData等のフォルダが含まれているフォルダを選択してください。",
+                        "エラー",
+                        [System.Windows.Forms.MessageBoxButtons]::OK,
+                        [System.Windows.Forms.MessageBoxIcon]::Warning
+                    )
+                }
+            }
+        }
+    }
 
     return $results
 }
