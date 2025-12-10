@@ -146,6 +146,44 @@ function Write-BackupLog {
 }
 
 #===============================================================================
+# 関数: Test-BackupDriveAvailable
+# 説明: バックアップ先ドライブが利用可能かチェック
+#===============================================================================
+function Test-BackupDriveAvailable {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    try {
+        # パスからドライブ文字を取得
+        if ($Path -match '^([A-Za-z]):') {
+            $driveLetter = $Matches[1]
+            $drive = Get-PSDrive -Name $driveLetter -ErrorAction SilentlyContinue
+            if (-not $drive) {
+                return $false
+            }
+            # ドライブにアクセスできるか確認
+            $testPath = "${driveLetter}:\"
+            if (-not (Test-Path -Path $testPath -ErrorAction SilentlyContinue)) {
+                return $false
+            }
+            return $true
+        }
+        # UNCパスなどの場合はTest-Pathで確認
+        $parentPath = Split-Path -Path $Path -Parent
+        if ($parentPath -and -not (Test-Path -Path $parentPath -ErrorAction SilentlyContinue)) {
+            return $false
+        }
+        return $true
+    }
+    catch {
+        return $false
+    }
+}
+
+#===============================================================================
 # 関数: Invoke-BackupRobocopy
 # 説明: robocopyでバックアップを実行
 #===============================================================================
@@ -269,6 +307,12 @@ function Backup-StandardFolders {
             continue
         }
 
+        # バックアップ先ドライブの存在チェック
+        if (-not (Test-BackupDriveAvailable -Path $BackupBasePath)) {
+            Write-BackupLog -Message "[$($folder.Name)] バックアップ先ドライブが見つかりません。バックアップを中止します。" -Level 'ERROR'
+            throw "バックアップ先ドライブが切断されました: $BackupBasePath"
+        }
+
         $sourcePath = Join-Path -Path $currentUserProfile -ChildPath $folder.FolderName
         $destPath = Join-Path -Path $BackupBasePath -ChildPath $folder.FolderName
 
@@ -319,6 +363,12 @@ function Backup-AppDataFolders {
     Write-BackupLog -Message "=== AppDataフォルダのバックアップ開始 ===" -Level 'INFO'
 
     foreach ($folder in $Script:AppDataFolders) {
+        # バックアップ先ドライブの存在チェック
+        if (-not (Test-BackupDriveAvailable -Path $BackupBasePath)) {
+            Write-BackupLog -Message "[$($folder.Name)] バックアップ先ドライブが見つかりません。バックアップを中止します。" -Level 'ERROR'
+            throw "バックアップ先ドライブが切断されました: $BackupBasePath"
+        }
+
         $sourcePath = Join-Path -Path $currentUserProfile -ChildPath $folder.FolderPath
         $destPath = Join-Path -Path $BackupBasePath -ChildPath $folder.FolderPath
 
@@ -374,6 +424,12 @@ function Backup-CloudDriveFolders {
         # 存在チェック
         if (-not (Test-Path -Path $sourcePath)) {
             continue
+        }
+
+        # バックアップ先ドライブの存在チェック
+        if (-not (Test-BackupDriveAvailable -Path $BackupBasePath)) {
+            Write-BackupLog -Message "[$($folder.Name)] バックアップ先ドライブが見つかりません。バックアップを中止します。" -Level 'ERROR'
+            throw "バックアップ先ドライブが切断されました: $BackupBasePath"
         }
 
         $destPath = Join-Path -Path $BackupBasePath -ChildPath $folder.FolderName
@@ -551,6 +607,12 @@ function Backup-BrowserData {
             Write-BackupLog -Message "[$($item.Name)] ファイルが見つかりません" -Level 'SKIP'
             $results.Skipped++
             continue
+        }
+
+        # バックアップ先ドライブの存在チェック
+        if (-not (Test-BackupDriveAvailable -Path $BackupBasePath)) {
+            Write-BackupLog -Message "[$($item.Name)] バックアップ先ドライブが見つかりません。バックアップを中止します。" -Level 'ERROR'
+            throw "バックアップ先ドライブが切断されました: $BackupBasePath"
         }
 
         $destPath = Join-Path -Path $BackupBasePath -ChildPath $item.TargetPath
