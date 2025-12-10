@@ -1,5 +1,3 @@
-#!/usr/bin/env powershell
-# -*- coding: utf-8 -*-
 <#
 .SYNOPSIS
     WiFiプロファイルをバックアップするモジュール
