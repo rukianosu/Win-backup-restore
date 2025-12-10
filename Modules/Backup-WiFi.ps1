@@ -1,45 +1,24 @@
-<#
-.SYNOPSIS
-    WiFiプロファイルをバックアップするモジュール
-
-.DESCRIPTION
-    - netsh wlan export profile でWiFi設定をXMLにエクスポート
-    - パスワードも含めてバックアップ（管理者権限必要）
-
-.NOTES
-    PowerShell 5.1 互換
-    管理者権限推奨
-#>
+# WiFi Backup Module
 
 function Write-WiFiLog {
-    [CmdletBinding()]
     param(
-        [Parameter(Mandatory = $true)]
         [string]$Message,
-
-        [Parameter(Mandatory = $false)]
-        [ValidateSet('INFO', 'SUCCESS', 'WARNING', 'ERROR', 'SKIP')]
         [string]$Level = 'INFO'
     )
-
     $logPath = "C:\AutoSetup\Logs\Backup.log"
     $logDir = Split-Path -Path $logPath -Parent
-
     if (-not (Test-Path -Path $logDir)) {
         New-Item -Path $logDir -ItemType Directory -Force | Out-Null
     }
-
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     $logEntry = "[$timestamp] [$Level] [WiFi] $Message"
-
     Add-Content -Path $logPath -Value $logEntry -Encoding UTF8
-
     $color = switch ($Level) {
         'SUCCESS' { 'Green' }
         'WARNING' { 'Yellow' }
-        'ERROR'   { 'Red' }
-        'SKIP'    { 'Gray' }
-        default   { 'White' }
+        'ERROR' { 'Red' }
+        'SKIP' { 'Gray' }
+        default { 'White' }
     }
     Write-Host $logEntry -ForegroundColor $color
 }
@@ -51,42 +30,29 @@ function Test-IsAdministrator {
 }
 
 function Get-WiFiProfiles {
-    [CmdletBinding()]
-    param()
-
     $profiles = @()
-
     try {
         $output = netsh wlan show profiles 2>&1
-
         if ($LASTEXITCODE -ne 0) {
-            Write-WiFiLog -Message "WiFiプロファイルの取得に失敗しました" -Level 'ERROR'
             return $profiles
         }
-
         foreach ($line in $output) {
-            if ($line -match "^\s*(All User Profile|すべてのユーザー プロファイル)\s*:\s*(.+)$") {
-                $profileName = $matches[2].Trim()
-                if ($profileName) {
-                    $profiles += $profileName
+            if ($line -match ":\s*(.+)$") {
+                $name = $matches[1].Trim()
+                if ($name -and $name -notmatch "^-+$") {
+                    $profiles += $name
                 }
             }
         }
     }
-    catch {
-        Write-WiFiLog -Message "WiFiプロファイル取得エラー: $_" -Level 'ERROR'
-    }
-
+    catch { }
     return $profiles
 }
 
 function Backup-WiFiProfiles {
-    [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
         [string]$BackupPath,
-
-        [Parameter(Mandatory = $false)]
         [hashtable]$Options = @{}
     )
 
@@ -98,23 +64,21 @@ function Backup-WiFiProfiles {
     }
 
     if ($Options.ContainsKey('BackupWiFi') -and -not $Options['BackupWiFi']) {
-        Write-WiFiLog -Message "WiFiバックアップがオプションでスキップされました" -Level 'SKIP'
+        Write-WiFiLog -Message "WiFi backup skipped by option" -Level 'SKIP'
         return $results
     }
 
-    Write-WiFiLog -Message "========================================" -Level 'INFO'
-    Write-WiFiLog -Message "WiFiプロファイル バックアップ開始" -Level 'INFO'
-    Write-WiFiLog -Message "========================================" -Level 'INFO'
+    Write-WiFiLog -Message "WiFi Profile Backup Start" -Level 'INFO'
 
     $wlanService = Get-Service -Name "WlanSvc" -ErrorAction SilentlyContinue
-    if (-not $wlanService -or $wlanService.Status -ne 'Running') {
-        Write-WiFiLog -Message "WiFiサービスが利用できません（有線接続のみの環境）" -Level 'SKIP'
+    if ($null -eq $wlanService -or $wlanService.Status -ne 'Running') {
+        Write-WiFiLog -Message "WiFi service not available" -Level 'SKIP'
         return $results
     }
 
     $isAdmin = Test-IsAdministrator
     if (-not $isAdmin) {
-        Write-WiFiLog -Message "警告: 管理者権限がないため、パスワードなしでエクスポートします" -Level 'WARNING'
+        Write-WiFiLog -Message "No admin rights - exporting without password" -Level 'WARNING'
     }
 
     $wifiBackupPath = Join-Path -Path $BackupPath -ChildPath "WiFi"
@@ -123,17 +87,14 @@ function Backup-WiFiProfiles {
     }
 
     $profiles = Get-WiFiProfiles
-
     if ($profiles.Count -eq 0) {
-        Write-WiFiLog -Message "保存されているWiFiプロファイルがありません" -Level 'SKIP'
+        Write-WiFiLog -Message "No WiFi profiles found" -Level 'SKIP'
         return $results
     }
 
-    Write-WiFiLog -Message "検出されたWiFiプロファイル数: $($profiles.Count)" -Level 'INFO'
+    Write-WiFiLog -Message "Found $($profiles.Count) WiFi profiles" -Level 'INFO'
 
     foreach ($profileName in $profiles) {
-        Write-WiFiLog -Message "エクスポート中: $profileName" -Level 'INFO'
-
         try {
             if ($isAdmin) {
                 $null = netsh wlan export profile name="$profileName" folder="$wifiBackupPath" key=clear 2>&1
@@ -143,28 +104,21 @@ function Backup-WiFiProfiles {
             }
 
             if ($LASTEXITCODE -eq 0) {
-                Write-WiFiLog -Message "  成功: $profileName" -Level 'SUCCESS'
+                Write-WiFiLog -Message "OK: $profileName" -Level 'SUCCESS'
                 $results.Success++
                 $results.ProfileNames += $profileName
             }
             else {
-                Write-WiFiLog -Message "  失敗: $profileName" -Level 'ERROR'
+                Write-WiFiLog -Message "NG: $profileName" -Level 'ERROR'
                 $results.Errors++
             }
         }
         catch {
-            Write-WiFiLog -Message "  エラー: $profileName - $_" -Level 'ERROR'
+            Write-WiFiLog -Message "Error: $profileName" -Level 'ERROR'
             $results.Errors++
         }
     }
 
-    Write-WiFiLog -Message "========================================" -Level 'INFO'
-    Write-WiFiLog -Message "WiFiバックアップ完了" -Level 'INFO'
-    Write-WiFiLog -Message "成功: $($results.Success), エラー: $($results.Errors)" -Level 'INFO'
-    if ($results.Success -gt 0) {
-        Write-WiFiLog -Message "保存先: $wifiBackupPath" -Level 'INFO'
-    }
-    Write-WiFiLog -Message "========================================" -Level 'INFO'
-
+    Write-WiFiLog -Message "WiFi Backup Complete - Success: $($results.Success)" -Level 'INFO'
     return $results
 }

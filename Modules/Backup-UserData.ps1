@@ -454,7 +454,7 @@ function Backup-CloudDriveFolders {
 
 #===============================================================================
 # 関数: Close-Browsers
-# 説明: Edge/Chromeを終了する（バックグラウンドプロセスも含む）
+# 説明: Edge/Chromeを終了する（taskkillで強制終了）
 #===============================================================================
 function Close-Browsers {
     [CmdletBinding()]
@@ -465,25 +465,15 @@ function Close-Browsers {
         Chrome = $false
     }
 
-    # Microsoft Edge を終了（関連プロセスもすべて終了）
-    $edgeProcessNames = @("msedge", "msedgewebview2", "MicrosoftEdgeUpdate")
-    $edgeProcesses = Get-Process -Name $edgeProcessNames -ErrorAction SilentlyContinue
-    if ($edgeProcesses) {
-        Write-BackupLog -Message "Microsoft Edge を終了中..." -Level 'INFO'
+    # Microsoft Edge を強制終了（taskkill使用）
+    $edgeProcess = Get-Process -Name "msedge" -ErrorAction SilentlyContinue
+    if ($edgeProcess) {
+        Write-BackupLog -Message "Microsoft Edge を強制終了中..." -Level 'INFO'
         try {
-            # まず通常終了を試みる
-            $mainEdge = Get-Process -Name "msedge" -ErrorAction SilentlyContinue
-            if ($mainEdge) {
-                $mainEdge | ForEach-Object { $_.CloseMainWindow() | Out-Null }
-                Start-Sleep -Seconds 3
-            }
-
-            # 残っているプロセスを強制終了
-            $remainingEdge = Get-Process -Name $edgeProcessNames -ErrorAction SilentlyContinue
-            if ($remainingEdge) {
-                $remainingEdge | Stop-Process -Force -ErrorAction SilentlyContinue
-                Start-Sleep -Seconds 2
-            }
+            # taskkillで確実に終了
+            $null = cmd /c "taskkill /F /IM msedge.exe /T" 2>&1
+            $null = cmd /c "taskkill /F /IM msedgewebview2.exe /T" 2>&1
+            Start-Sleep -Seconds 2
             Write-BackupLog -Message "Microsoft Edge を終了しました" -Level 'SUCCESS'
             $closed.Edge = $true
         }
@@ -492,25 +482,14 @@ function Close-Browsers {
         }
     }
 
-    # Google Chrome を終了（関連プロセスもすべて終了）
-    $chromeProcessNames = @("chrome", "GoogleUpdate", "GoogleCrashHandler", "GoogleCrashHandler64")
-    $chromeProcesses = Get-Process -Name $chromeProcessNames -ErrorAction SilentlyContinue
-    if ($chromeProcesses) {
-        Write-BackupLog -Message "Google Chrome を終了中..." -Level 'INFO'
+    # Google Chrome を強制終了（taskkill使用）
+    $chromeProcess = Get-Process -Name "chrome" -ErrorAction SilentlyContinue
+    if ($chromeProcess) {
+        Write-BackupLog -Message "Google Chrome を強制終了中..." -Level 'INFO'
         try {
-            # まず通常終了を試みる
-            $mainChrome = Get-Process -Name "chrome" -ErrorAction SilentlyContinue
-            if ($mainChrome) {
-                $mainChrome | ForEach-Object { $_.CloseMainWindow() | Out-Null }
-                Start-Sleep -Seconds 3
-            }
-
-            # 残っているプロセスを強制終了
-            $remainingChrome = Get-Process -Name $chromeProcessNames -ErrorAction SilentlyContinue
-            if ($remainingChrome) {
-                $remainingChrome | Stop-Process -Force -ErrorAction SilentlyContinue
-                Start-Sleep -Seconds 2
-            }
+            # taskkillで確実に終了
+            $null = cmd /c "taskkill /F /IM chrome.exe /T" 2>&1
+            Start-Sleep -Seconds 2
             Write-BackupLog -Message "Google Chrome を終了しました" -Level 'SUCCESS'
             $closed.Chrome = $true
         }
@@ -704,6 +683,15 @@ function Backup-AllUserData {
     if ($Options.ContainsKey('CloseBrowsers') -and $Options['CloseBrowsers']) {
         Write-Host "  [4/5] ブラウザを終了中..." -ForegroundColor Cyan
         Write-Progress -Activity "ユーザーデータバックアップ" -Status "ブラウザを終了中..." -PercentComplete 65
+
+        # 実際にブラウザを終了
+        $browserStatus = Test-BrowserRunning
+        if ($browserStatus.Edge -or $browserStatus.Chrome) {
+            Write-BackupLog -Message "ブラウザを強制終了します..." -Level 'INFO'
+            $closedBrowsers = Close-Browsers
+            # ファイルロック解除のため待機
+            Start-Sleep -Seconds 3
+        }
     }
 
     # ブックマークをバックアップ
