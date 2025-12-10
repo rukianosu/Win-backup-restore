@@ -123,6 +123,83 @@ function Test-BrowserRunning {
 }
 
 #===============================================================================
+# 関数: Close-Browsers
+# 説明: Edge/Chromeを強制終了する（バックグラウンドプロセスも含む）
+#       ※設定は変更しないので再起動すれば元に戻る
+#===============================================================================
+function Close-Browsers {
+    [CmdletBinding()]
+    param()
+
+    $closed = @{
+        Edge = $false
+        Chrome = $false
+    }
+
+    # Microsoft Edge を終了（関連プロセスもすべて終了）
+    $edgeProcessNames = @("msedge", "msedgewebview2")
+    $edgeProcesses = Get-Process -Name $edgeProcessNames -ErrorAction SilentlyContinue
+    if ($edgeProcesses) {
+        Write-BrowserLog -Message "Microsoft Edge を終了中..." -Level 'INFO'
+        try {
+            # まず通常終了を試みる
+            $mainEdge = Get-Process -Name "msedge" -ErrorAction SilentlyContinue
+            if ($mainEdge) {
+                $mainEdge | ForEach-Object { $_.CloseMainWindow() | Out-Null }
+                Start-Sleep -Seconds 2
+            }
+
+            # 残っているプロセスを強制終了
+            $remainingEdge = Get-Process -Name $edgeProcessNames -ErrorAction SilentlyContinue
+            if ($remainingEdge) {
+                $remainingEdge | Stop-Process -Force -ErrorAction SilentlyContinue
+                Start-Sleep -Seconds 1
+            }
+            Write-BrowserLog -Message "Microsoft Edge を終了しました" -Level 'SUCCESS'
+            $closed.Edge = $true
+        }
+        catch {
+            Write-BrowserLog -Message "Microsoft Edge の終了に失敗: $_" -Level 'WARNING'
+        }
+    }
+
+    # Google Chrome を終了（関連プロセスもすべて終了）
+    $chromeProcessNames = @("chrome")
+    $chromeProcesses = Get-Process -Name $chromeProcessNames -ErrorAction SilentlyContinue
+    if ($chromeProcesses) {
+        Write-BrowserLog -Message "Google Chrome を終了中..." -Level 'INFO'
+        try {
+            # まず通常終了を試みる
+            $mainChrome = Get-Process -Name "chrome" -ErrorAction SilentlyContinue
+            if ($mainChrome) {
+                $mainChrome | ForEach-Object { $_.CloseMainWindow() | Out-Null }
+                Start-Sleep -Seconds 2
+            }
+
+            # 残っているプロセスを強制終了
+            $remainingChrome = Get-Process -Name $chromeProcessNames -ErrorAction SilentlyContinue
+            if ($remainingChrome) {
+                $remainingChrome | Stop-Process -Force -ErrorAction SilentlyContinue
+                Start-Sleep -Seconds 1
+            }
+            Write-BrowserLog -Message "Google Chrome を終了しました" -Level 'SUCCESS'
+            $closed.Chrome = $true
+        }
+        catch {
+            Write-BrowserLog -Message "Google Chrome の終了に失敗: $_" -Level 'WARNING'
+        }
+    }
+
+    # 追加の待機（ファイルロック解除のため）
+    if ($closed.Edge -or $closed.Chrome) {
+        Write-BrowserLog -Message "ファイルロック解除を待機中..." -Level 'INFO'
+        Start-Sleep -Seconds 2
+    }
+
+    return $closed
+}
+
+#===============================================================================
 # 関数: Backup-ExistingFile
 # 説明: 既存のファイルをバックアップ
 #===============================================================================
@@ -239,14 +316,27 @@ function Restore-AllBrowserData {
     Write-BrowserLog -Message "（お気に入り、閲覧履歴、オートフィル、設定）" -Level 'INFO'
     Write-BrowserLog -Message "========================================" -Level 'INFO'
 
-    # ブラウザ起動中の警告
+    # ブラウザ自動終了オプションのチェック
+    $closeBrowsersOption = $true  # デフォルトでON
+    if ($Options.ContainsKey('CloseBrowsers')) {
+        $closeBrowsersOption = $Options['CloseBrowsers']
+    }
+
+    # ブラウザ起動中の処理
     $edgeRunning = Test-BrowserRunning -ProcessName "msedge"
     $chromeRunning = Test-BrowserRunning -ProcessName "chrome"
 
     if ($edgeRunning -or $chromeRunning) {
-        Write-BrowserLog -Message "注意: ブラウザを閉じてから復元することを推奨します" -Level 'WARNING'
-        if ($edgeRunning) { Write-BrowserLog -Message "  - Microsoft Edge が起動中" -Level 'WARNING' }
-        if ($chromeRunning) { Write-BrowserLog -Message "  - Google Chrome が起動中" -Level 'WARNING' }
+        if ($closeBrowsersOption) {
+            Write-BrowserLog -Message "ブラウザを自動終了します..." -Level 'INFO'
+            $closedBrowsers = Close-Browsers
+            # 追加の待機時間（ファイルロック解除のため）
+            Start-Sleep -Seconds 2
+        } else {
+            Write-BrowserLog -Message "注意: ブラウザを閉じてから復元することを推奨します" -Level 'WARNING'
+            if ($edgeRunning) { Write-BrowserLog -Message "  - Microsoft Edge が起動中" -Level 'WARNING' }
+            if ($chromeRunning) { Write-BrowserLog -Message "  - Google Chrome が起動中" -Level 'WARNING' }
+        }
     }
 
     foreach ($user in $SelectedUsers) {

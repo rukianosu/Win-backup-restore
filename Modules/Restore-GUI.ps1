@@ -43,6 +43,7 @@ function Show-UserSelectionDialog {
             RestoreRegistry   = $true
             RestoreCloudDrive = $true
             RestoreWiFi       = $true
+            CloseBrowsers     = $true   # ブラウザ自動終了（デフォルトON）
             UseBackupMode     = $false  # 外部HDD復旧モード（デフォルトOFF）
         }
         Confirmed = $false
@@ -53,7 +54,7 @@ function Show-UserSelectionDialog {
     #---------------------------------------------------------------------------
     $form = New-Object System.Windows.Forms.Form
     $form.Text = "ユーザーデータ復元ツール"
-    $form.Size = New-Object System.Drawing.Size(650, 650)
+    $form.Size = New-Object System.Drawing.Size(650, 670)
     $form.StartPosition = "CenterScreen"
     $form.FormBorderStyle = "FixedDialog"
     $form.MaximizeBox = $false
@@ -91,7 +92,7 @@ function Show-UserSelectionDialog {
     #---------------------------------------------------------------------------
     $optionGroup = New-Object System.Windows.Forms.GroupBox
     $optionGroup.Location = New-Object System.Drawing.Point(20, 210)
-    $optionGroup.Size = New-Object System.Drawing.Size(590, 250)
+    $optionGroup.Size = New-Object System.Drawing.Size(590, 270)
     $optionGroup.Text = "復元オプション"
     $form.Controls.Add($optionGroup)
 
@@ -111,7 +112,8 @@ function Show-UserSelectionDialog {
         @{ Name = "RestoreBookmarks";  Text = "ブラウザブックマーク（Edge/Chrome）"; Y = 50 },
         @{ Name = "RestoreRegistry";   Text = "レジストリ設定（IME等）";         Y = 75 },
         @{ Name = "RestoreCloudDrive"; Text = "クラウドドライブ（OneDrive等）";   Y = 100 },
-        @{ Name = "RestoreWiFi";       Text = "WiFi設定";                      Y = 125 }
+        @{ Name = "RestoreWiFi";       Text = "WiFi設定";                      Y = 125 },
+        @{ Name = "CloseBrowsers";     Text = "復元前にブラウザを自動終了";       Y = 150 }
     )
 
     # 左列のチェックボックス
@@ -142,7 +144,7 @@ function Show-UserSelectionDialog {
     # 全選択/全解除ボタン
     #---------------------------------------------------------------------------
     $selectAllBtn = New-Object System.Windows.Forms.Button
-    $selectAllBtn.Location = New-Object System.Drawing.Point(20, 185)
+    $selectAllBtn.Location = New-Object System.Drawing.Point(20, 205)
     $selectAllBtn.Size = New-Object System.Drawing.Size(100, 25)
     $selectAllBtn.Text = "全選択"
     $selectAllBtn.Add_Click({
@@ -153,7 +155,7 @@ function Show-UserSelectionDialog {
     $optionGroup.Controls.Add($selectAllBtn)
 
     $deselectAllBtn = New-Object System.Windows.Forms.Button
-    $deselectAllBtn.Location = New-Object System.Drawing.Point(130, 185)
+    $deselectAllBtn.Location = New-Object System.Drawing.Point(130, 205)
     $deselectAllBtn.Size = New-Object System.Drawing.Size(100, 25)
     $deselectAllBtn.Text = "全解除"
     $deselectAllBtn.Add_Click({
@@ -165,7 +167,7 @@ function Show-UserSelectionDialog {
 
     # オプション全選択/全解除
     $optSelectAllBtn = New-Object System.Windows.Forms.Button
-    $optSelectAllBtn.Location = New-Object System.Drawing.Point(350, 185)
+    $optSelectAllBtn.Location = New-Object System.Drawing.Point(350, 205)
     $optSelectAllBtn.Size = New-Object System.Drawing.Size(110, 25)
     $optSelectAllBtn.Text = "オプション全選択"
     $optSelectAllBtn.Add_Click({
@@ -176,7 +178,7 @@ function Show-UserSelectionDialog {
     $optionGroup.Controls.Add($optSelectAllBtn)
 
     $optDeselectAllBtn = New-Object System.Windows.Forms.Button
-    $optDeselectAllBtn.Location = New-Object System.Drawing.Point(470, 185)
+    $optDeselectAllBtn.Location = New-Object System.Drawing.Point(470, 205)
     $optDeselectAllBtn.Size = New-Object System.Drawing.Size(110, 25)
     $optDeselectAllBtn.Text = "オプション全解除"
     $optDeselectAllBtn.Add_Click({
@@ -190,7 +192,7 @@ function Show-UserSelectionDialog {
     # 外部HDD復旧モード（別グループ）
     #---------------------------------------------------------------------------
     $backupModeGroup = New-Object System.Windows.Forms.GroupBox
-    $backupModeGroup.Location = New-Object System.Drawing.Point(20, 470)
+    $backupModeGroup.Location = New-Object System.Drawing.Point(20, 490)
     $backupModeGroup.Size = New-Object System.Drawing.Size(590, 60)
     $backupModeGroup.Text = "外部HDD復旧モード"
     $backupModeGroup.ForeColor = [System.Drawing.Color]::DarkBlue
@@ -208,7 +210,7 @@ function Show-UserSelectionDialog {
     # OK / キャンセルボタン
     #---------------------------------------------------------------------------
     $okButton = New-Object System.Windows.Forms.Button
-    $okButton.Location = New-Object System.Drawing.Point(400, 545)
+    $okButton.Location = New-Object System.Drawing.Point(400, 565)
     $okButton.Size = New-Object System.Drawing.Size(100, 35)
     $okButton.Text = "復元開始"
     $okButton.Font = New-Object System.Drawing.Font("Yu Gothic UI", 10, [System.Drawing.FontStyle]::Bold)
@@ -247,7 +249,7 @@ function Show-UserSelectionDialog {
     $form.Controls.Add($okButton)
 
     $cancelButton = New-Object System.Windows.Forms.Button
-    $cancelButton.Location = New-Object System.Drawing.Point(510, 545)
+    $cancelButton.Location = New-Object System.Drawing.Point(510, 565)
     $cancelButton.Size = New-Object System.Drawing.Size(100, 35)
     $cancelButton.Text = "キャンセル"
     $cancelButton.Add_Click({
