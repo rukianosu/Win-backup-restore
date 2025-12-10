@@ -83,6 +83,7 @@ function Show-BackupDialog {
             BackupBookmarks   = $true
             BackupRegistry    = $true
             BackupCloudDrive  = $true
+            BackupWiFi        = $true
             CloseBrowsers     = $true   # ブラウザ自動終了（推奨）
         }
         Confirmed = $false
@@ -93,7 +94,7 @@ function Show-BackupDialog {
     #---------------------------------------------------------------------------
     $form = New-Object System.Windows.Forms.Form
     $form.Text = "ユーザーデータ バックアップツール"
-    $form.Size = New-Object System.Drawing.Size(600, 640)
+    $form.Size = New-Object System.Drawing.Size(600, 680)
     $form.StartPosition = "CenterScreen"
     $form.FormBorderStyle = "FixedDialog"
     $form.MaximizeBox = $false
@@ -221,7 +222,7 @@ function Show-BackupDialog {
     #---------------------------------------------------------------------------
     $optionGroup = New-Object System.Windows.Forms.GroupBox
     $optionGroup.Location = New-Object System.Drawing.Point(20, 245)
-    $optionGroup.Size = New-Object System.Drawing.Size(540, 270)
+    $optionGroup.Size = New-Object System.Drawing.Size(540, 295)
     $optionGroup.Text = "バックアップ対象"
     $form.Controls.Add($optionGroup)
 
@@ -241,7 +242,8 @@ function Show-BackupDialog {
         @{ Name = "BackupBookmarks";  Text = "ブラウザデータ（履歴・オートフィル等）"; Y = 50 },
         @{ Name = "BackupRegistry";   Text = "レジストリ設定（IME等）";         Y = 75 },
         @{ Name = "BackupCloudDrive"; Text = "クラウドドライブ（OneDrive等）";   Y = 100 },
-        @{ Name = "CloseBrowsers";    Text = "ブラウザを自動終了（推奨）";       Y = 125 }
+        @{ Name = "BackupWiFi";       Text = "WiFi設定";                      Y = 125 },
+        @{ Name = "CloseBrowsers";    Text = "ブラウザを自動終了（推奨）";       Y = 150 }
     )
 
     # 左列のチェックボックス
@@ -270,7 +272,7 @@ function Show-BackupDialog {
 
     # 全選択/全解除ボタン
     $optSelectAllBtn = New-Object System.Windows.Forms.Button
-    $optSelectAllBtn.Location = New-Object System.Drawing.Point(20, 200)
+    $optSelectAllBtn.Location = New-Object System.Drawing.Point(20, 225)
     $optSelectAllBtn.Size = New-Object System.Drawing.Size(100, 25)
     $optSelectAllBtn.Text = "全選択"
     $optSelectAllBtn.Add_Click({
@@ -281,7 +283,7 @@ function Show-BackupDialog {
     $optionGroup.Controls.Add($optSelectAllBtn)
 
     $optDeselectAllBtn = New-Object System.Windows.Forms.Button
-    $optDeselectAllBtn.Location = New-Object System.Drawing.Point(130, 200)
+    $optDeselectAllBtn.Location = New-Object System.Drawing.Point(130, 225)
     $optDeselectAllBtn.Size = New-Object System.Drawing.Size(100, 25)
     $optDeselectAllBtn.Text = "全解除"
     $optDeselectAllBtn.Add_Click({
@@ -295,7 +297,7 @@ function Show-BackupDialog {
     # 現在のユーザー情報
     #---------------------------------------------------------------------------
     $userInfoLabel = New-Object System.Windows.Forms.Label
-    $userInfoLabel.Location = New-Object System.Drawing.Point(20, 525)
+    $userInfoLabel.Location = New-Object System.Drawing.Point(20, 550)
     $userInfoLabel.Size = New-Object System.Drawing.Size(400, 20)
     $userInfoLabel.Text = "バックアップ対象ユーザー: $env:USERNAME"
     $userInfoLabel.ForeColor = [System.Drawing.Color]::Blue
@@ -305,7 +307,7 @@ function Show-BackupDialog {
     # バックアップ開始 / キャンセルボタン
     #---------------------------------------------------------------------------
     $okButton = New-Object System.Windows.Forms.Button
-    $okButton.Location = New-Object System.Drawing.Point(350, 555)
+    $okButton.Location = New-Object System.Drawing.Point(350, 590)
     $okButton.Size = New-Object System.Drawing.Size(100, 35)
     $okButton.Text = "バックアップ開始"
     $okButton.Font = New-Object System.Drawing.Font("Yu Gothic UI", 9, [System.Drawing.FontStyle]::Bold)
@@ -350,7 +352,7 @@ function Show-BackupDialog {
     $form.Controls.Add($okButton)
 
     $cancelButton = New-Object System.Windows.Forms.Button
-    $cancelButton.Location = New-Object System.Drawing.Point(460, 555)
+    $cancelButton.Location = New-Object System.Drawing.Point(460, 590)
     $cancelButton.Size = New-Object System.Drawing.Size(100, 35)
     $cancelButton.Text = "キャンセル"
     $cancelButton.Add_Click({

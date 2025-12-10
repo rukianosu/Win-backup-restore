@@ -56,6 +56,12 @@ $Script:ExportRegistryKeys = @(
         KeyPath     = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"
         ExportFile  = "ExplorerAdvanced.reg"
         Description = "エクスプローラーの詳細設定"
+    },
+    @{
+        Name        = "デスクトップ設定（壁紙等）"
+        KeyPath     = "HKCU:\Control Panel\Desktop"
+        ExportFile  = "Desktop.reg"
+        Description = "壁紙、スクリーンセーバー等のデスクトップ設定"
     }
 )
 

@@ -207,7 +207,8 @@ $Script:ModulesPath = Join-Path -Path $Script:ScriptRoot -ChildPath "Modules"
 $Script:ModuleList = @(
     "Backup-GUI.ps1",
     "Backup-UserData.ps1",
-    "Backup-Registry.ps1"
+    "Backup-Registry.ps1",
+    "Backup-WiFi.ps1"
 )
 
 function Import-BackupModules {
@@ -312,6 +313,7 @@ function Start-BackupProcess {
             BackupBookmarks   = $true
             BackupRegistry    = $true
             BackupCloudDrive  = $true
+            BackupWiFi        = $true
             CloseBrowsers     = $true
         }
     }
@@ -405,9 +407,18 @@ function Start-BackupProcess {
     #---------------------------------------------------------------------------
     Write-Host ""
     Write-MainLog -Message "Step 3: レジストリ設定をバックアップ中..." -Level 'INFO'
-    Write-Progress -Activity "バックアップ処理中" -Status "レジストリをバックアップ中..." -PercentComplete 80
+    Write-Progress -Activity "バックアップ処理中" -Status "レジストリをバックアップ中..." -PercentComplete 60
 
     $registryResults = Backup-UserRegistry -BackupBasePath $backupUserPath -Options $options
+
+    #---------------------------------------------------------------------------
+    # Step 5: WiFi設定をバックアップ
+    #---------------------------------------------------------------------------
+    Write-Host ""
+    Write-MainLog -Message "Step 4: WiFi設定をバックアップ中..." -Level 'INFO'
+    Write-Progress -Activity "バックアップ処理中" -Status "WiFi設定をバックアップ中..." -PercentComplete 85
+
+    $wifiResults = Backup-WiFiProfiles -BackupPath $backupBasePath -Options $options
 
     # プログレス完了
     Write-Progress -Activity "バックアップ処理中" -Status "完了" -PercentComplete 100 -Completed
@@ -415,9 +426,9 @@ function Start-BackupProcess {
     #---------------------------------------------------------------------------
     # 完了サマリー
     #---------------------------------------------------------------------------
-    $totalSuccess = $dataResults.Success + $registryResults.Success
-    $totalSkipped = $dataResults.Skipped + $registryResults.Skipped
-    $totalErrors = $dataResults.Errors + $registryResults.Errors
+    $totalSuccess = $dataResults.Success + $registryResults.Success + $wifiResults.Success
+    $totalSkipped = $dataResults.Skipped + $registryResults.Skipped + $wifiResults.Skipped
+    $totalErrors = $dataResults.Errors + $registryResults.Errors + $wifiResults.Errors
 
     $endTime = Get-Date
     $duration = $endTime - $Script:StartTime

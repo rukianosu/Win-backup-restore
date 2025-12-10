@@ -42,6 +42,7 @@ function Show-UserSelectionDialog {
             RestoreBookmarks  = $true
             RestoreRegistry   = $true
             RestoreCloudDrive = $true
+            RestoreWiFi       = $true
         }
         Confirmed = $false
     }
@@ -108,7 +109,8 @@ function Show-UserSelectionDialog {
         @{ Name = "RestoreAppData";    Text = "AppData（辞書・テーマ）";         Y = 25 },
         @{ Name = "RestoreBookmarks";  Text = "ブラウザブックマーク（Edge/Chrome）"; Y = 50 },
         @{ Name = "RestoreRegistry";   Text = "レジストリ設定（IME等）";         Y = 75 },
-        @{ Name = "RestoreCloudDrive"; Text = "クラウドドライブ（OneDrive等）";   Y = 100 }
+        @{ Name = "RestoreCloudDrive"; Text = "クラウドドライブ（OneDrive等）";   Y = 100 },
+        @{ Name = "RestoreWiFi";       Text = "WiFi設定";                      Y = 125 }
     )
 
     # 左列のチェックボックス

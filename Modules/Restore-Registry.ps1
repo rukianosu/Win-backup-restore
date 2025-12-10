@@ -52,6 +52,12 @@ $Script:SafeRegistryKeys = @(
         Name = "環境変数"
         SourcePath = "Environment"
         Description = "ユーザー環境変数"
+    },
+    # デスクトップ設定（壁紙等）
+    @{
+        Name = "デスクトップ設定（壁紙等）"
+        SourcePath = "Control Panel\Desktop"
+        Description = "壁紙、スクリーンセーバー等のデスクトップ設定"
     }
 )
 

@@ -94,11 +94,14 @@ function Find-UsersFolder {
     Write-Verbose "ドライブ $DriveLetter 内のUsersフォルダを検索中..."
 
     # 検索対象のパスパターン（Windowsバックアップの一般的な構造）
+    # R-Studio等のデータ復旧ソフトで救出した場合、深い階層にある可能性あり
     $searchPaths = @(
         "$DriveLetter\Users",                          # 直接Users
         "$DriveLetter\Backup\Users",                   # Backupフォルダ内
         "$DriveLetter\WindowsBackup\Users",            # WindowsBackup内
-        "$DriveLetter\*\Users"                         # 1階層下
+        "$DriveLetter\*\Users",                        # 1階層下
+        "$DriveLetter\*\*\Users",                      # 2階層下
+        "$DriveLetter\*\*\*\Users"                     # 3階層下（R-Studio復旧等）
     )
 
     $foundPaths = @()

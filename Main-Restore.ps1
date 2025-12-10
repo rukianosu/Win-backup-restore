@@ -162,7 +162,8 @@ $Script:ModuleList = @(
     "Restore-GUI.ps1",
     "Copy-UserData.ps1",
     "Restore-BrowserBookmarks.ps1",
-    "Restore-Registry.ps1"
+    "Restore-Registry.ps1",
+    "Restore-WiFi.ps1"
 )
 
 function Import-RestoreModules {
@@ -299,6 +300,7 @@ function Start-RestoreProcess {
             RestoreBookmarks  = $true
             RestoreRegistry   = $true
             RestoreCloudDrive = $true
+            RestoreWiFi       = $true
         }
     }
     else {
@@ -368,9 +370,18 @@ $(($selectedUsers | ForEach-Object { "  - $($_.UserName)" }) -join "`n")
     #---------------------------------------------------------------------------
     Write-Host ""
     Write-MainLog -Message "Step 5: レジストリ設定を復元中..." -Level 'INFO'
-    Write-Progress -Activity "復元処理中" -Status "レジストリを復元中..." -PercentComplete 85
+    Write-Progress -Activity "復元処理中" -Status "レジストリを復元中..." -PercentComplete 70
 
     $registryResults = Restore-UserRegistry -SelectedUsers $selectedUsers -Options $options
+
+    #---------------------------------------------------------------------------
+    # Step 7: WiFi設定を復元
+    #---------------------------------------------------------------------------
+    Write-Host ""
+    Write-MainLog -Message "Step 6: WiFi設定を復元中..." -Level 'INFO'
+    Write-Progress -Activity "復元処理中" -Status "WiFi設定を復元中..." -PercentComplete 90
+
+    $wifiResults = Restore-WiFiProfiles -SelectedUsers $selectedUsers -Options $options
 
     # プログレス完了
     Write-Progress -Activity "復元処理中" -Status "完了" -PercentComplete 100 -Completed
@@ -378,9 +389,9 @@ $(($selectedUsers | ForEach-Object { "  - $($_.UserName)" }) -join "`n")
     #---------------------------------------------------------------------------
     # 完了サマリー
     #---------------------------------------------------------------------------
-    $totalSuccess = $copyResults.Success + $bookmarkResults.Success + $registryResults.Success
-    $totalSkipped = $copyResults.Skipped + $bookmarkResults.Skipped + $registryResults.Skipped
-    $totalErrors = $copyResults.Errors + $bookmarkResults.Errors + $registryResults.Errors
+    $totalSuccess = $copyResults.Success + $bookmarkResults.Success + $registryResults.Success + $wifiResults.Success
+    $totalSkipped = $copyResults.Skipped + $bookmarkResults.Skipped + $registryResults.Skipped + $wifiResults.Skipped
+    $totalErrors = $copyResults.Errors + $bookmarkResults.Errors + $registryResults.Errors + $wifiResults.Errors
 
     $endTime = Get-Date
     $duration = $endTime - $Script:StartTime
