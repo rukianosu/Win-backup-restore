@@ -43,6 +43,7 @@ function Show-UserSelectionDialog {
             RestoreRegistry   = $true
             RestoreCloudDrive = $true
             RestoreWiFi       = $true
+            UseBackupMode     = $false  # 外部HDD復旧モード（デフォルトOFF）
         }
         Confirmed = $false
     }
@@ -52,7 +53,7 @@ function Show-UserSelectionDialog {
     #---------------------------------------------------------------------------
     $form = New-Object System.Windows.Forms.Form
     $form.Text = "ユーザーデータ復元ツール"
-    $form.Size = New-Object System.Drawing.Size(650, 580)
+    $form.Size = New-Object System.Drawing.Size(650, 650)
     $form.StartPosition = "CenterScreen"
     $form.FormBorderStyle = "FixedDialog"
     $form.MaximizeBox = $false
@@ -186,10 +187,28 @@ function Show-UserSelectionDialog {
     $optionGroup.Controls.Add($optDeselectAllBtn)
 
     #---------------------------------------------------------------------------
+    # 外部HDD復旧モード（別グループ）
+    #---------------------------------------------------------------------------
+    $backupModeGroup = New-Object System.Windows.Forms.GroupBox
+    $backupModeGroup.Location = New-Object System.Drawing.Point(20, 470)
+    $backupModeGroup.Size = New-Object System.Drawing.Size(590, 60)
+    $backupModeGroup.Text = "外部HDD復旧モード"
+    $backupModeGroup.ForeColor = [System.Drawing.Color]::DarkBlue
+    $form.Controls.Add($backupModeGroup)
+
+    $backupModeCheckbox = New-Object System.Windows.Forms.CheckBox
+    $backupModeCheckbox.Location = New-Object System.Drawing.Point(20, 25)
+    $backupModeCheckbox.Size = New-Object System.Drawing.Size(550, 22)
+    $backupModeCheckbox.Text = "アクセス権限のない外部HDDからデータを読み取る（管理者権限必須）"
+    $backupModeCheckbox.Name = "UseBackupMode"
+    $backupModeCheckbox.Checked = $false
+    $backupModeGroup.Controls.Add($backupModeCheckbox)
+
+    #---------------------------------------------------------------------------
     # OK / キャンセルボタン
     #---------------------------------------------------------------------------
     $okButton = New-Object System.Windows.Forms.Button
-    $okButton.Location = New-Object System.Drawing.Point(400, 475)
+    $okButton.Location = New-Object System.Drawing.Point(400, 545)
     $okButton.Size = New-Object System.Drawing.Size(100, 35)
     $okButton.Text = "復元開始"
     $okButton.Font = New-Object System.Drawing.Font("Yu Gothic UI", 10, [System.Drawing.FontStyle]::Bold)
@@ -219,13 +238,16 @@ function Show-UserSelectionDialog {
             $script:DialogResult.Options[$cb.Name] = $cb.Checked
         }
 
+        # 外部HDD復旧モードを格納
+        $script:DialogResult.Options['UseBackupMode'] = $backupModeCheckbox.Checked
+
         $script:DialogResult.Confirmed = $true
         $form.Close()
     })
     $form.Controls.Add($okButton)
 
     $cancelButton = New-Object System.Windows.Forms.Button
-    $cancelButton.Location = New-Object System.Drawing.Point(510, 475)
+    $cancelButton.Location = New-Object System.Drawing.Point(510, 545)
     $cancelButton.Size = New-Object System.Drawing.Size(100, 35)
     $cancelButton.Text = "キャンセル"
     $cancelButton.Add_Click({

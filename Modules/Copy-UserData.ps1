@@ -108,7 +108,10 @@ function Invoke-RobocopyWithLog {
         [string]$FolderName = "",
 
         [Parameter(Mandatory = $false)]
-        [switch]$Mirror = $false
+        [switch]$Mirror = $false,
+
+        [Parameter(Mandatory = $false)]
+        [switch]$UseBackupMode = $false
     )
 
     # ソースフォルダ存在チェック
@@ -157,6 +160,13 @@ function Invoke-RobocopyWithLog {
             "/XO"           # 新しいファイルのみコピー（上書き保護）
         )
 
+        # バックアップモード（外部HDD復旧用）
+        # /B = バックアップ権限を使用してファイルを読み取る（NTFS権限をバイパス）
+        if ($UseBackupMode) {
+            $robocopyArgs += "/B"
+            Write-RestoreLog -Message "[$FolderName] バックアップモード（/B）を使用" -Level 'INFO'
+        }
+
         # Mirrorモードの場合は /MIR を追加（削除も行う）
         if ($Mirror) {
             $robocopyArgs = @(
@@ -170,6 +180,9 @@ function Invoke-RobocopyWithLog {
                 "/NP",
                 "/XJ"
             )
+            if ($UseBackupMode) {
+                $robocopyArgs += "/B"
+            }
         }
 
         $argString = $robocopyArgs -join " "
@@ -238,6 +251,7 @@ function Copy-StandardFolders {
     }
 
     $currentUserProfile = $env:USERPROFILE
+    $useBackupMode = $Options.ContainsKey('UseBackupMode') -and $Options['UseBackupMode']
 
     Write-RestoreLog -Message "=== 標準フォルダの復元開始 ===" -Level 'INFO'
 
@@ -253,7 +267,7 @@ function Copy-StandardFolders {
         $sourcePath = Join-Path -Path $SourceUserPath -ChildPath $folder.Source
         $destPath = Join-Path -Path $currentUserProfile -ChildPath $folder.Target
 
-        $copyResult = Invoke-RobocopyWithLog -Source $sourcePath -Destination $destPath -FolderName $folder.Name
+        $copyResult = Invoke-RobocopyWithLog -Source $sourcePath -Destination $destPath -FolderName $folder.Name -UseBackupMode:$useBackupMode
 
         if ($copyResult.Success) {
             $results.Success++
@@ -296,6 +310,7 @@ function Copy-AppDataFolders {
     }
 
     $currentUserProfile = $env:USERPROFILE
+    $useBackupMode = $Options.ContainsKey('UseBackupMode') -and $Options['UseBackupMode']
 
     Write-RestoreLog -Message "=== AppDataフォルダの復元開始 ===" -Level 'INFO'
 
@@ -303,7 +318,7 @@ function Copy-AppDataFolders {
         $sourcePath = Join-Path -Path $SourceUserPath -ChildPath $folder.Source
         $destPath = Join-Path -Path $currentUserProfile -ChildPath $folder.Target
 
-        $copyResult = Invoke-RobocopyWithLog -Source $sourcePath -Destination $destPath -FolderName $folder.Name
+        $copyResult = Invoke-RobocopyWithLog -Source $sourcePath -Destination $destPath -FolderName $folder.Name -UseBackupMode:$useBackupMode
 
         if ($copyResult.Success) {
             $results.Success++
@@ -346,6 +361,7 @@ function Copy-CloudDriveFolders {
     }
 
     $currentUserProfile = $env:USERPROFILE
+    $useBackupMode = $Options.ContainsKey('UseBackupMode') -and $Options['UseBackupMode']
 
     Write-RestoreLog -Message "=== クラウドドライブの復元開始 ===" -Level 'INFO'
 
@@ -362,7 +378,7 @@ function Copy-CloudDriveFolders {
 
         Write-RestoreLog -Message "[$($folder.Name)] クラウドドライブ発見: $sourcePath" -Level 'INFO'
 
-        $copyResult = Invoke-RobocopyWithLog -Source $sourcePath -Destination $destPath -FolderName $folder.Name
+        $copyResult = Invoke-RobocopyWithLog -Source $sourcePath -Destination $destPath -FolderName $folder.Name -UseBackupMode:$useBackupMode
 
         if ($copyResult.Success) {
             $results.Success++
@@ -401,6 +417,9 @@ function Copy-AllUserData {
     Write-RestoreLog -Message "========================================" -Level 'INFO'
     Write-RestoreLog -Message "ユーザーデータ復元処理開始" -Level 'INFO'
     Write-RestoreLog -Message "対象ユーザー数: $($SelectedUsers.Count)" -Level 'INFO'
+    if ($Options.ContainsKey('UseBackupMode') -and $Options['UseBackupMode']) {
+        Write-RestoreLog -Message "外部HDD復旧モード: 有効（バックアップ権限を使用）" -Level 'INFO'
+    }
     Write-RestoreLog -Message "========================================" -Level 'INFO'
 
     $userIndex = 0

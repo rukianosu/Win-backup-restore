@@ -88,7 +88,10 @@ function Find-UsersFolder {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [string]$DriveLetter
+        [string]$DriveLetter,
+
+        [Parameter(Mandatory = $false)]
+        [ref]$AccessDeniedDetected = ([ref]$false)
     )
 
     Write-Verbose "ドライブ $DriveLetter 内のUsersフォルダを検索中..."
@@ -117,11 +120,13 @@ function Find-UsersFolder {
         try {
             # ワイルドカードを含むパターンの場合
             if ($pattern -like '*`**') {
-                $resolved = Get-ChildItem -Path $pattern -Directory -ErrorAction SilentlyContinue
+                $resolved = Get-ChildItem -Path $pattern -Directory -ErrorAction Stop 2>&1
                 foreach ($item in $resolved) {
-                    if (Test-Path -Path $item.FullName) {
-                        $foundPaths += $item.FullName
-                        Write-Verbose "Usersフォルダ発見: $($item.FullName)"
+                    if ($item -is [System.IO.DirectoryInfo]) {
+                        if (Test-Path -Path $item.FullName) {
+                            $foundPaths += $item.FullName
+                            Write-Verbose "Usersフォルダ発見: $($item.FullName)"
+                        }
                     }
                 }
             }
@@ -134,7 +139,17 @@ function Find-UsersFolder {
             }
         }
         catch {
-            Write-Verbose "パス検索エラー ($pattern): $_"
+            if ($_.Exception.Message -like "*アクセスが拒否*" -or
+                $_.Exception.Message -like "*Access*denied*" -or
+                $_.Exception.Message -like "*UnauthorizedAccess*") {
+                if ($AccessDeniedDetected) {
+                    $AccessDeniedDetected.Value = $true
+                }
+                Write-Verbose "アクセス拒否: $pattern"
+            }
+            else {
+                Write-Verbose "パス検索エラー ($pattern): $_"
+            }
         }
     }
 
@@ -328,12 +343,15 @@ function Scan-AllBackupDrives {
         Write-Host "  $($drive.DriveLetter) - $($drive.VolumeName) ($($drive.DriveType), $($drive.SizeGB)GB)" -ForegroundColor White
     }
 
+    # アクセス拒否検出フラグ
+    $accessDeniedFlag = $false
+
     # 各ドライブのUsersフォルダを検索
     foreach ($drive in $drives) {
         Write-Host "`n$($drive.DriveLetter) をスキャン中..." -ForegroundColor Yellow
 
         # 1. まずUsersフォルダを検索
-        $usersFolders = Find-UsersFolder -DriveLetter $drive.DriveLetter
+        $usersFolders = Find-UsersFolder -DriveLetter $drive.DriveLetter -AccessDeniedDetected ([ref]$accessDeniedFlag)
 
         foreach ($usersPath in $usersFolders) {
             Write-Host "  Usersフォルダ発見: $usersPath" -ForegroundColor Green
@@ -398,13 +416,26 @@ function Scan-AllBackupDrives {
     Write-Host " スキャン完了: $($results.Count) ユーザー検出" -ForegroundColor Cyan
     Write-Host "========================================" -ForegroundColor Cyan
 
+    # アクセス拒否が検出された場合の警告
+    if ($accessDeniedFlag) {
+        Write-Host "`n[警告] 一部のフォルダにアクセス権限がありません" -ForegroundColor Yellow
+        Write-Host "外部HDDから復旧する場合は、復元画面で「外部HDD復旧モード」を有効にしてください" -ForegroundColor Yellow
+        Write-Host "（管理者権限で実行することで、アクセス制限を回避できます）" -ForegroundColor Yellow
+    }
+
     # 3. 見つからない場合、手動指定オプションを提示
     if ($results.Count -eq 0) {
         Write-Host "`n[情報] ユーザーフォルダが自動検出できませんでした" -ForegroundColor Yellow
 
         Add-Type -AssemblyName System.Windows.Forms
+
+        $manualDialogMessage = "ユーザーフォルダが自動検出できませんでした。`n`n手動でユーザープロファイルフォルダを指定しますか？`n（Desktop, Documents等があるフォルダを選択）"
+        if ($accessDeniedFlag) {
+            $manualDialogMessage += "`n`n※アクセス権限の問題が検出されました。`n復元時は「外部HDD復旧モード」を有効にしてください。"
+        }
+
         $dialogResult = [System.Windows.Forms.MessageBox]::Show(
-            "ユーザーフォルダが自動検出できませんでした。`n`n手動でユーザープロファイルフォルダを指定しますか？`n（Desktop, Documents等があるフォルダを選択）",
+            $manualDialogMessage,
             "手動指定",
             [System.Windows.Forms.MessageBoxButtons]::YesNo,
             [System.Windows.Forms.MessageBoxIcon]::Question
