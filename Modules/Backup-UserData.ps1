@@ -684,14 +684,19 @@ function Backup-AllUserData {
         Write-Host "  [4/5] ブラウザを終了中..." -ForegroundColor Cyan
         Write-Progress -Activity "ユーザーデータバックアップ" -Status "ブラウザを終了中..." -PercentComplete 65
 
-        # 実際にブラウザを終了
-        $browserStatus = Test-BrowserRunning
-        if ($browserStatus.Edge -or $browserStatus.Chrome) {
-            Write-BackupLog -Message "ブラウザを強制終了します..." -Level 'INFO'
-            $closedBrowsers = Close-Browsers
-            # ファイルロック解除のため待機
-            Start-Sleep -Seconds 3
-        }
+        # 常にブラウザを強制終了（検出に依存しない）
+        Write-BackupLog -Message "Edge/Chromeを強制終了します..." -Level 'INFO'
+
+        # taskkillで強制終了（プロセスがなくてもエラーにならない）
+        $null = cmd /c "taskkill /F /IM msedge.exe /T 2>nul"
+        $null = cmd /c "taskkill /F /IM msedgewebview2.exe /T 2>nul"
+        $null = cmd /c "taskkill /F /IM chrome.exe /T 2>nul"
+
+        Write-BackupLog -Message "ブラウザ終了コマンド実行完了" -Level 'INFO'
+
+        # ファイルロック解除のため待機
+        Write-BackupLog -Message "ファイルロック解除を待機中（5秒）..." -Level 'INFO'
+        Start-Sleep -Seconds 5
     }
 
     # ブックマークをバックアップ
