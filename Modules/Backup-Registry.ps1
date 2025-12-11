@@ -228,6 +228,33 @@ function Backup-UserRegistry {
         }
     }
 
+    # 壁紙画像ファイルをバックアップ
+    try {
+        $wallpaperPath = (Get-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name Wallpaper -ErrorAction SilentlyContinue).Wallpaper
+        if ($wallpaperPath -and (Test-Path -Path $wallpaperPath -ErrorAction SilentlyContinue)) {
+            $wallpaperBackupDir = Join-Path -Path $registryBackupDir -ChildPath "Wallpaper"
+            if (-not (Test-Path -Path $wallpaperBackupDir)) {
+                New-Item -Path $wallpaperBackupDir -ItemType Directory -Force | Out-Null
+            }
+            $wallpaperFileName = Split-Path -Path $wallpaperPath -Leaf
+            $wallpaperDestPath = Join-Path -Path $wallpaperBackupDir -ChildPath $wallpaperFileName
+            Copy-Item -Path $wallpaperPath -Destination $wallpaperDestPath -Force
+
+            # 壁紙パス情報を保存
+            $wallpaperInfoPath = Join-Path -Path $wallpaperBackupDir -ChildPath "wallpaper_info.txt"
+            "OriginalPath=$wallpaperPath" | Out-File -FilePath $wallpaperInfoPath -Encoding UTF8 -Force
+
+            Write-RegistryBackupLog -Message "[壁紙] 画像ファイルをバックアップ: $wallpaperFileName" -Level 'SUCCESS'
+            $results.Success++
+        }
+        else {
+            Write-RegistryBackupLog -Message "[壁紙] 壁紙が設定されていないか、ファイルが見つかりません" -Level 'SKIP'
+        }
+    }
+    catch {
+        Write-RegistryBackupLog -Message "[壁紙] バックアップ失敗: $_" -Level 'WARNING'
+    }
+
     # NTUSER.DATの情報を記録（復元時の参考用）
     $infoFilePath = Join-Path -Path $registryBackupDir -ChildPath "backup_info.txt"
     $infoContent = @"

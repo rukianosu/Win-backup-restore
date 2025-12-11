@@ -358,6 +358,91 @@ function Restore-SafeRegistryKeys {
 }
 
 #===============================================================================
+# 関数: Restore-Wallpaper
+# 説明: 壁紙を復元して適用
+#===============================================================================
+function Restore-Wallpaper {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$SourceUserPath
+    )
+
+    $results = @{
+        Success = $false
+        Message = ""
+    }
+
+    # バックアップされた壁紙フォルダを探す
+    $wallpaperBackupDir = Join-Path -Path $SourceUserPath -ChildPath "Registry\Wallpaper"
+
+    if (-not (Test-Path -Path $wallpaperBackupDir)) {
+        Write-RegistryLog -Message "[壁紙] バックアップされた壁紙が見つかりません" -Level 'SKIP'
+        return $results
+    }
+
+    # 壁紙画像ファイルを探す
+    $wallpaperFiles = Get-ChildItem -Path $wallpaperBackupDir -File | Where-Object { $_.Extension -match '\.(jpg|jpeg|png|bmp|gif)$' }
+
+    if (-not $wallpaperFiles -or $wallpaperFiles.Count -eq 0) {
+        Write-RegistryLog -Message "[壁紙] 壁紙画像ファイルが見つかりません" -Level 'SKIP'
+        return $results
+    }
+
+    $sourceWallpaper = $wallpaperFiles[0].FullName
+    Write-RegistryLog -Message "[壁紙] バックアップ壁紙を発見: $($wallpaperFiles[0].Name)" -Level 'INFO'
+
+    try {
+        # 壁紙を現在のユーザーのPicturesフォルダにコピー
+        $destWallpaperDir = Join-Path -Path $env:USERPROFILE -ChildPath "Pictures\Wallpapers"
+        if (-not (Test-Path -Path $destWallpaperDir)) {
+            New-Item -Path $destWallpaperDir -ItemType Directory -Force | Out-Null
+        }
+
+        $destWallpaperPath = Join-Path -Path $destWallpaperDir -ChildPath $wallpaperFiles[0].Name
+        Copy-Item -Path $sourceWallpaper -Destination $destWallpaperPath -Force
+
+        Write-RegistryLog -Message "[壁紙] 画像をコピー: $destWallpaperPath" -Level 'SUCCESS'
+
+        # Windows APIで壁紙を適用
+        Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public class Wallpaper {
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    public static extern int SystemParametersInfo(int uAction, int uParam, string lpvParam, int fuWinIni);
+    public const int SPI_SETDESKWALLPAPER = 0x0014;
+    public const int SPIF_UPDATEINIFILE = 0x01;
+    public const int SPIF_SENDCHANGE = 0x02;
+}
+"@ -ErrorAction SilentlyContinue
+
+        $result = [Wallpaper]::SystemParametersInfo(
+            [Wallpaper]::SPI_SETDESKWALLPAPER,
+            0,
+            $destWallpaperPath,
+            [Wallpaper]::SPIF_UPDATEINIFILE -bor [Wallpaper]::SPIF_SENDCHANGE
+        )
+
+        if ($result -ne 0) {
+            Write-RegistryLog -Message "[壁紙] 壁紙を適用しました" -Level 'SUCCESS'
+            $results.Success = $true
+            $results.Message = "壁紙を適用しました"
+        }
+        else {
+            Write-RegistryLog -Message "[壁紙] 壁紙の適用に失敗しました（APIエラー）" -Level 'WARNING'
+            $results.Message = "APIエラー"
+        }
+    }
+    catch {
+        Write-RegistryLog -Message "[壁紙] 壁紙の復元に失敗: $_" -Level 'WARNING'
+        $results.Message = $_.Exception.Message
+    }
+
+    return $results
+}
+
+#===============================================================================
 # 関数: Restore-UserRegistry
 # 説明: ユーザーレジストリを復元（メイン関数）
 #===============================================================================
@@ -430,6 +515,12 @@ function Restore-UserRegistry {
         finally {
             # 必ずアンマウント
             Dismount-BackupRegistry -MountPoint $mountPoint -TempFile $tempFile
+        }
+
+        # 壁紙を復元（レジストリとは別に画像ファイルを適用）
+        $wallpaperResult = Restore-Wallpaper -SourceUserPath $user.UserFullPath
+        if ($wallpaperResult.Success) {
+            $totalResults.Success++
         }
     }
 
