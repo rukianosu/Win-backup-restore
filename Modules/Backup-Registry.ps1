@@ -231,21 +231,49 @@ function Backup-UserRegistry {
     # 壁紙画像ファイルをバックアップ
     try {
         $wallpaperPath = (Get-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name Wallpaper -ErrorAction SilentlyContinue).Wallpaper
+        Write-RegistryBackupLog -Message "[壁紙] レジストリのパス: $wallpaperPath" -Level 'INFO'
+
+        # TranscodedWallpaperも確認（Windowsがキャッシュする場所）
+        $transcodedPath = Join-Path -Path $env:APPDATA -ChildPath "Microsoft\Windows\Themes\TranscodedWallpaper"
+
+        $wallpaperBackupDir = Join-Path -Path $registryBackupDir -ChildPath "Wallpaper"
+        if (-not (Test-Path -Path $wallpaperBackupDir)) {
+            New-Item -Path $wallpaperBackupDir -ItemType Directory -Force | Out-Null
+        }
+
+        $wallpaperBacked = $false
+
+        # 方法1: レジストリのパスから直接コピー
         if ($wallpaperPath -and (Test-Path -Path $wallpaperPath -ErrorAction SilentlyContinue)) {
-            $wallpaperBackupDir = Join-Path -Path $registryBackupDir -ChildPath "Wallpaper"
-            if (-not (Test-Path -Path $wallpaperBackupDir)) {
-                New-Item -Path $wallpaperBackupDir -ItemType Directory -Force | Out-Null
-            }
             $wallpaperFileName = Split-Path -Path $wallpaperPath -Leaf
+            # 拡張子がない場合は.jpgを追加
+            if (-not [System.IO.Path]::HasExtension($wallpaperFileName)) {
+                $wallpaperFileName = "$wallpaperFileName.jpg"
+            }
             $wallpaperDestPath = Join-Path -Path $wallpaperBackupDir -ChildPath $wallpaperFileName
             Copy-Item -Path $wallpaperPath -Destination $wallpaperDestPath -Force
-
-            # 壁紙パス情報を保存
-            $wallpaperInfoPath = Join-Path -Path $wallpaperBackupDir -ChildPath "wallpaper_info.txt"
-            "OriginalPath=$wallpaperPath" | Out-File -FilePath $wallpaperInfoPath -Encoding UTF8 -Force
-
             Write-RegistryBackupLog -Message "[壁紙] 画像ファイルをバックアップ: $wallpaperFileName" -Level 'SUCCESS'
+            $wallpaperBacked = $true
             $results.Success++
+        }
+
+        # 方法2: TranscodedWallpaperからコピー（レジストリパスが無効な場合）
+        if (-not $wallpaperBacked -and (Test-Path -Path $transcodedPath -ErrorAction SilentlyContinue)) {
+            $wallpaperDestPath = Join-Path -Path $wallpaperBackupDir -ChildPath "TranscodedWallpaper.jpg"
+            Copy-Item -Path $transcodedPath -Destination $wallpaperDestPath -Force
+            Write-RegistryBackupLog -Message "[壁紙] TranscodedWallpaperをバックアップ" -Level 'SUCCESS'
+            $wallpaperBacked = $true
+            $results.Success++
+        }
+
+        # 壁紙パス情報を保存
+        if ($wallpaperBacked) {
+            $wallpaperInfoPath = Join-Path -Path $wallpaperBackupDir -ChildPath "wallpaper_info.txt"
+            @"
+OriginalPath=$wallpaperPath
+TranscodedPath=$transcodedPath
+BackupDate=$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+"@ | Out-File -FilePath $wallpaperInfoPath -Encoding UTF8 -Force
         }
         else {
             Write-RegistryBackupLog -Message "[壁紙] 壁紙が設定されていないか、ファイルが見つかりません" -Level 'SKIP'

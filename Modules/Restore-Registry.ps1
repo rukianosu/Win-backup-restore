@@ -381,16 +381,22 @@ function Restore-Wallpaper {
         return $results
     }
 
-    # 壁紙画像ファイルを探す
-    $wallpaperFiles = Get-ChildItem -Path $wallpaperBackupDir -File | Where-Object { $_.Extension -match '\.(jpg|jpeg|png|bmp|gif)$' }
+    # 壁紙画像ファイルを探す（拡張子あり・なし両方対応）
+    $wallpaperFiles = Get-ChildItem -Path $wallpaperBackupDir -File | Where-Object {
+        $_.Name -notlike "*.txt" -and $_.Name -notlike "*.log"
+    }
 
     if (-not $wallpaperFiles -or $wallpaperFiles.Count -eq 0) {
         Write-RegistryLog -Message "[壁紙] 壁紙画像ファイルが見つかりません" -Level 'SKIP'
         return $results
     }
 
-    $sourceWallpaper = $wallpaperFiles[0].FullName
-    Write-RegistryLog -Message "[壁紙] バックアップ壁紙を発見: $($wallpaperFiles[0].Name)" -Level 'INFO'
+    # 優先順位: 拡張子付き > TranscodedWallpaper
+    $sourceWallpaper = $wallpaperFiles | Where-Object { $_.Extension -match '\.(jpg|jpeg|png|bmp|gif)$' } | Select-Object -First 1
+    if (-not $sourceWallpaper) {
+        $sourceWallpaper = $wallpaperFiles[0]
+    }
+    Write-RegistryLog -Message "[壁紙] バックアップ壁紙を発見: $($sourceWallpaper.Name)" -Level 'INFO'
 
     try {
         # 壁紙を現在のユーザーのPicturesフォルダにコピー
@@ -399,8 +405,13 @@ function Restore-Wallpaper {
             New-Item -Path $destWallpaperDir -ItemType Directory -Force | Out-Null
         }
 
-        $destWallpaperPath = Join-Path -Path $destWallpaperDir -ChildPath $wallpaperFiles[0].Name
-        Copy-Item -Path $sourceWallpaper -Destination $destWallpaperPath -Force
+        # ファイル名を決定（拡張子がなければ.jpgを追加）
+        $destFileName = $sourceWallpaper.Name
+        if (-not [System.IO.Path]::HasExtension($destFileName)) {
+            $destFileName = "$destFileName.jpg"
+        }
+        $destWallpaperPath = Join-Path -Path $destWallpaperDir -ChildPath $destFileName
+        Copy-Item -Path $sourceWallpaper.FullName -Destination $destWallpaperPath -Force
 
         Write-RegistryLog -Message "[壁紙] 画像をコピー: $destWallpaperPath" -Level 'SUCCESS'
 
