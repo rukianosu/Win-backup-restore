@@ -205,6 +205,7 @@ function Write-MainLog {
 #===============================================================================
 $Script:ModulesPath = Join-Path -Path $Script:ScriptRoot -ChildPath "Modules"
 $Script:ModuleList = @(
+    "Power-Management.ps1",
     "Backup-GUI.ps1",
     "Backup-UserData.ps1",
     "Backup-Registry.ps1",
@@ -394,6 +395,13 @@ function Start-BackupProcess {
     }
 
     #---------------------------------------------------------------------------
+    # 電源設定を一時的に無効化（スリープ防止）
+    #---------------------------------------------------------------------------
+    Write-Host ""
+    Write-MainLog -Message "電源設定を変更中..." -Level 'INFO'
+    Disable-PowerSaving | Out-Null
+
+    #---------------------------------------------------------------------------
     # Step 3: ユーザーデータをバックアップ
     #---------------------------------------------------------------------------
     Write-Host ""
@@ -447,6 +455,10 @@ function Start-BackupProcess {
     Write-MainLog -Message "バックアップ先: $backupUserPath" -Level 'INFO'
     Write-MainLog -Message "ログファイル: $Script:LogPath" -Level 'INFO'
     Write-MainLog -Message "========================================" -Level 'INFO'
+
+    # 電源設定を復元
+    Write-MainLog -Message "電源設定を復元中..." -Level 'INFO'
+    Restore-PowerSaving | Out-Null
 
     # 完了音を鳴らす
     if ($totalErrors -gt 0) {
