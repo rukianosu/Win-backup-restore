@@ -231,15 +231,65 @@ function Invoke-BackupRobocopy {
             "/R:3",         # リトライ回数
             "/W:5",         # リトライ間隔（秒）
             "/MT:8",        # マルチスレッド
-            "/NP",          # 進捗表示なし
+            "/NDL",         # ディレクトリ名を表示しない
+            "/NC",          # ファイルクラスを表示しない
+            "/BYTES",       # バイト単位でサイズ表示
             "/XJ",          # ジャンクションを除外
             "/XA:SH",       # システム・隠しファイルを除外
             "/XO"           # 古いファイルを除外（変更なしはスキップ）
         )
 
         $argString = $robocopyArgs -join " "
-        $result = cmd /c "robocopy $argString 2>&1"
-        $exitCode = $LASTEXITCODE
+
+        # robocopyをバックグラウンドで実行し、進捗を監視
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = "robocopy"
+        $psi.Arguments = $argString
+        $psi.UseShellExecute = $false
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError = $true
+        $psi.CreateNoWindow = $true
+
+        $process = New-Object System.Diagnostics.Process
+        $process.StartInfo = $psi
+        $process.Start() | Out-Null
+
+        # 進捗表示用変数
+        $lastActivityTime = Get-Date
+        $fileCount = 0
+        $spinner = @('|', '/', '-', '\')
+        $spinnerIndex = 0
+
+        # 出力を非同期で読み取り
+        while (-not $process.HasExited) {
+            # 5秒ごとに活動中メッセージを表示
+            $now = Get-Date
+            if (($now - $lastActivityTime).TotalSeconds -ge 5) {
+                $spinnerChar = $spinner[$spinnerIndex % 4]
+                Write-Host "`r  $spinnerChar [$FolderName] コピー中... (ファイル: $fileCount) $spinnerChar  " -NoNewline -ForegroundColor Cyan
+                $spinnerIndex++
+                $lastActivityTime = $now
+            }
+
+            # 出力があれば読み取り
+            if (-not $process.StandardOutput.EndOfStream) {
+                $line = $process.StandardOutput.ReadLine()
+                if ($line -and $line.Trim()) {
+                    $fileCount++
+                }
+            }
+
+            Start-Sleep -Milliseconds 100
+        }
+
+        # 残りの出力を読み取り
+        $null = $process.StandardOutput.ReadToEnd()
+        $null = $process.StandardError.ReadToEnd()
+        $exitCode = $process.ExitCode
+        $process.Dispose()
+
+        # 改行して進捗表示をクリア
+        Write-Host "`r                                                              `r" -NoNewline
 
         # robocopy終了コードの解釈
         if ($exitCode -lt 8) {
