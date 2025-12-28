@@ -209,7 +209,8 @@ $Script:ModuleList = @(
     "Backup-GUI.ps1",
     "Backup-UserData.ps1",
     "Backup-Registry.ps1",
-    "Backup-WiFi.ps1"
+    "Backup-WiFi.ps1",
+    "Verify-Backup.ps1"
 )
 
 function Import-BackupModules {
@@ -427,6 +428,15 @@ function Start-BackupProcess {
     Write-Progress -Activity "バックアップ処理中" -Status "WiFi設定をバックアップ中..." -PercentComplete 85
 
     $wifiResults = Backup-WiFiProfiles -BackupPath $backupBasePath -Options $options
+
+    #---------------------------------------------------------------------------
+    # Step 6: バックアップ検証
+    #---------------------------------------------------------------------------
+    Write-Host ""
+    Write-MainLog -Message "Step 5: バックアップを検証中..." -Level 'INFO'
+    Write-Progress -Activity "バックアップ処理中" -Status "バックアップを検証中..." -PercentComplete 95
+
+    $verifyResults = Invoke-BackupVerification -SourceBasePath $env:USERPROFILE -DestBasePath $backupUserPath -Options $options
 
     # プログレス完了
     Write-Progress -Activity "バックアップ処理中" -Status "完了" -PercentComplete 100 -Completed

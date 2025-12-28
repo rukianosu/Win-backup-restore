@@ -164,7 +164,8 @@ $Script:ModuleList = @(
     "Copy-UserData.ps1",
     "Restore-BrowserBookmarks.ps1",
     "Restore-Registry.ps1",
-    "Restore-WiFi.ps1"
+    "Restore-WiFi.ps1",
+    "Verify-Backup.ps1"
 )
 
 function Import-RestoreModules {
@@ -390,6 +391,18 @@ $(($selectedUsers | ForEach-Object { "  - $($_.UserName)" }) -join "`n")
     Write-Progress -Activity "復元処理中" -Status "WiFi設定を復元中..." -PercentComplete 90
 
     $wifiResults = Restore-WiFiProfiles -SelectedUsers $selectedUsers -Options $options
+
+    #---------------------------------------------------------------------------
+    # Step 8: 復元検証
+    #---------------------------------------------------------------------------
+    Write-Host ""
+    Write-MainLog -Message "Step 7: 復元を検証中..." -Level 'INFO'
+    Write-Progress -Activity "復元処理中" -Status "復元を検証中..." -PercentComplete 95
+
+    # 最初のユーザーのパスを使用して検証
+    if ($selectedUsers.Count -gt 0) {
+        $verifyResults = Invoke-RestoreVerification -SourceBasePath $selectedUsers[0].UserFullPath -DestBasePath $env:USERPROFILE -Options $options
+    }
 
     # プログレス完了
     Write-Progress -Activity "復元処理中" -Status "完了" -PercentComplete 100 -Completed
