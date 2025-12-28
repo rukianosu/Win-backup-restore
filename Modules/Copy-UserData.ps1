@@ -46,6 +46,11 @@ $Script:AppDataFolders = @(
         Name   = "Google日本語入力"
         Source = "AppData\LocalLow\Google\Google Japanese Input"
         Target = "AppData\LocalLow\Google\Google Japanese Input"
+    },
+    @{
+        Name   = "ATOK（ジャストシステム）"
+        Source = "AppData\Roaming\Justsystem"
+        Target = "AppData\Roaming\Justsystem"
     }
 )
 
