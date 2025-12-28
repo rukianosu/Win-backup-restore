@@ -39,6 +39,10 @@ $Script:AppDataFolders = @(
     @{
         Name       = "テーマ（Themes）"
         FolderPath = "AppData\Roaming\Microsoft\Windows\Themes"
+    },
+    @{
+        Name       = "Google日本語入力"
+        FolderPath = "AppData\LocalLow\Google\Google Japanese Input"
     }
 )
 
